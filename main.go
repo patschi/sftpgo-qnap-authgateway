@@ -28,6 +28,7 @@ import (
 // -----------------------------
 // Configuration constants
 // -----------------------------
+
 const (
 	// AppName is the name of the application
 	AppName = "SftpgoQnapAuthGateway"
@@ -39,7 +40,7 @@ const (
 	// HttpTimeout defines HTTP client timeout for requests to QNAP API
 	HttpTimeout = 10 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
-	MaxBodyBytes = 25 * 1024 // 25 KiB
+	MaxBodyBytes = 2 * 1024 // 2 KiB
 )
 
 var (
@@ -63,6 +64,7 @@ var (
 // -----------------------------
 // Types for QNAP responses
 // -----------------------------
+
 // xmlLoginResp is the response from QNAP API for login requests
 type xmlLoginResp struct {
 	XMLName    xml.Name `xml:"QDocRoot"`
@@ -83,6 +85,7 @@ type shareNode struct {
 // -----------------------------
 // Types for incoming request and SFTPGo response
 // -----------------------------
+
 // authRequest is the incoming request from sftpgo (parameters which are used for this gateway)
 type authRequest struct {
 	Username            string `json:"username"`
@@ -121,6 +124,7 @@ type sftpgoResponse struct {
 // -----------------------------
 // Helper functions
 // -----------------------------
+
 // getEnv retrieves environment variable with ability of fallback value
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -151,6 +155,7 @@ func LoggerFromContext(ctx context.Context) *log.Entry {
 // -----------------------------
 // Main
 // -----------------------------
+
 func init() {
 	// Force UTC timezone
 	time.Local = time.UTC // ensure default time.Local is UTC for timestamp generation
@@ -305,6 +310,7 @@ func clientIPFromRequest(r *http.Request) string {
 // -----------------------------
 // Handler
 // -----------------------------
+
 // authHandler is the main handler for the auth endpoint.
 // It handles authentication requests from sftpgo and returns a response to sftpgo.
 // It is called by the HTTP server mux.
@@ -349,6 +355,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// check for supported authentication methods
 	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TlsCert != "" {
 		rlog.Warn("unsupported authentication method")
 		writeDeny(w, http.StatusBadRequest, "unsupported_method", "unsupported authentication method")
@@ -518,6 +525,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------
 // Deny helper
 // -----------------------------
+
 // writeDeny writes a JSON response to w with the given status code and error code.
 // It also sets the Content-Type header to application/json.
 //
@@ -549,6 +557,7 @@ func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message stri
 // QNAP helpers: login + get_tree
 // Each uses ctx; client is per-request and has its own cookiejar.
 // -----------------------------
+
 var errAuthFailed = errors.New("authentication failed")
 
 // qnapLogin authenticates a user with a QNAP device and returns the session ID if login is successful or an error otherwise.

@@ -1,4 +1,4 @@
-# sftpgo-QNAP-Auth-Gateway
+# sftpgo-qnap-authgateway
 
 Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and auto‑map their accessible shares as virtual folders. Fast, stateless, and logs every request with a request ID.
 
