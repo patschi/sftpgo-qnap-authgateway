@@ -1,9 +1,9 @@
-# Sftpgo QNAP Auth Gateway
+# sftpgo-QNAP-Auth-Gateway
 
 Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and auto‑map their accessible shares as virtual folders. Fast, stateless, and logs every request with a request ID.
 
 ## Features
-- Authenticates via QNAP `authLogin.cgi`
+- Authenticates via QNAP API
 - Builds SFTPGo virtual folders from QNAP shares
 - Per‑request cookies, strict timeouts, structured logging
 - Simple JSON API for SFTPGo external auth
