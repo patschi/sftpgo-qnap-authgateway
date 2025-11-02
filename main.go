@@ -52,7 +52,7 @@ var (
 	QnapHost string
 	// QnapPort defines the port to use for QNAP API calls
 	QnapPort string
-	// QnapSharePath defines path for QNAP shares where share is located
+	// QnapSharePath defines a path for QNAP shares where the share is located
 	// (example: /share/{path}/; as in /share/Public)
 	QnapSharePath string
 	// QnapCheckCert defines if we should check certificates when accessing QNAP API
@@ -198,7 +198,7 @@ func WipeBuffer(buf *bytes.Buffer) {
 	}
 	b := buf.Bytes()
 	if cap(b) > 0 {
-		bs := b[:cap(b)] // span full backing array from current start
+		bs := b[:cap(b)] // span full backing array from the current start
 		for i := range bs {
 			bs[i] = 0
 		}
@@ -212,7 +212,7 @@ func WipeBuffer(buf *bytes.Buffer) {
 // Helper functions
 // -----------------------------
 
-// getEnv retrieves environment variable with ability of fallback value
+// getEnv retrieves environment variable with the ability of fallback value
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -261,7 +261,7 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 	log.Infof("%s %s starting up", AppName, AppVersion)
 
-	// Set log level
+	// Set the log level
 	logLevelStr := strings.TrimSpace(os.Getenv("LOG_LEVEL"))
 	if logLevelStr == "" {
 		log.SetLevel(log.DebugLevel)
@@ -322,7 +322,7 @@ func main() {
 			"qnap":   fmt.Sprintf("%s://%s:%s", QnapHttp, QnapHost, QnapPort),
 		}).Info("starting QNAP auth gateway")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("HTTP server error: %v", err)
+			log.Errorf("HTTP server error: %v", err)
 			os.Exit(1)
 		}
 	}()
@@ -342,7 +342,7 @@ func main() {
 	}
 }
 
-// HttpServerMiddleware takes care about transparent logging and request-id
+// HttpServerMiddleware takes care of transparent logging and request-id
 func HttpServerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now().UTC()
@@ -486,7 +486,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		"ip":       req.IP,
 	}).Info("auth request received")
 
-	// Create per-request cookie jar and client (no shared cookies)
+	// Create a per-request cookie jar and client (no shared cookies)
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
 		Jar:     jar,
@@ -553,7 +553,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check each QNAP share
 	for _, s := range shares {
-		// Skip any shares which are not iconCls=folder
+		// Skip any shares that are not iconCls=folder
 		if s.IconCls != "folder" {
 			rlog.WithFields(log.Fields{
 				"name": s.ID,
@@ -563,7 +563,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// skip any shares which user does not have either
+		// skip any shares that the user does not have either
 		// read or write access to
 		if s.Cls != "r" && s.Cls != "w" {
 			rlog.WithFields(log.Fields{
@@ -634,8 +634,8 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
 
-	log.Info("reported authentication success to sftpgo")
-	log.WithField("response", string(data)).Trace("debug authentication json response")
+	rlog.Info("reported authentication success to sftpgo")
+	rlog.WithField("response", string(data)).Trace("debug authentication json response")
 }
 
 // -----------------------------
@@ -671,7 +671,7 @@ func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message stri
 
 // -----------------------------
 // QNAP helpers: login + get_tree
-// Each uses ctx; client is per-request and has its own cookiejar.
+// Each uses ctx; the client is per-request and has its own cookiejar.
 // -----------------------------
 
 var errAuthFailed = errors.New("authentication failed")
