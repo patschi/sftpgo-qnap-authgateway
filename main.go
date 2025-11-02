@@ -50,6 +50,9 @@ var (
 	QnapHost string
 	// QnapPort defines the port to use for QNAP API calls
 	QnapPort string
+	// QnapSharePath defines path for QNAP shares where share is located
+	// (example: /share/{path}/; as in /share/Public)
+	QnapSharePath string
 	// QnapCheckCert defines if we should check certificates when accessing QNAP API
 	QnapCheckCert bool
 
@@ -103,7 +106,6 @@ type sftpgoVF struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	MappedPath  string `json:"mapped_path"`
-	QuotaSize   int64  `json:"quota_size"`
 }
 
 // sftpgoResponse is the final response to sftpgo after authentication
@@ -193,6 +195,9 @@ func main() {
 	QnapHttp = getEnv("QNAP_HTTP", "https")
 	QnapHost = getEnv("QNAP_HOST", "127.0.0.1")
 	QnapPort = getEnv("QNAP_PORT", "443")
+
+	QnapSharePath = getEnv("QNAP_SHARE_PATH", "/share/{name}/")
+	QnapSharePath = strings.TrimSpace(QnapSharePath)
 
 	QnapCheckCertStr := getEnv("QNAP_CHECKCERT", "true")
 	QnapCheckCert = false
@@ -297,8 +302,8 @@ func clientIPFromRequest(r *http.Request) string {
 			return strings.TrimSpace(parts[0])
 		}
 	}
-	if realip := strings.TrimSpace(r.Header.Get("X-Real-IP")); realip != "" {
-		return realip
+	if realIp := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIp != "" {
+		return realIp
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -436,7 +441,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	perms := make(map[string][]string, len(shares)+1)
 	vfs := make([]sftpgoVF, 0, len(shares))
 
-	// Deny access to root folder
+	// Deny access to the root folder
 	perms["/"] = SharePermsDeny
 
 	// Check each QNAP share
@@ -465,9 +470,13 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		// build virtual folder
 		name := s.Text
 		if name == "" {
-			name = strings.TrimSpace(strings.Trim(s.ID, "/"))
+			name = strings.Trim(s.ID, "/")
 		}
-		path := strings.TrimSpace(s.ID)
+		name = strings.TrimSpace(name)
+
+		// Build paths for virtual folder and QNAP
+		sftpgoPath := strings.TrimSpace(s.ID)
+		qnapPath := strings.Replace(QnapSharePath, "{name}", name, 1)
 
 		// build permissions
 		var vfPerms = SharePermsDeny
@@ -476,21 +485,21 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		} else if s.Cls == "r" {
 			vfPerms = SharePermsReadOnly
 		}
-		perms[path] = vfPerms
+		perms[sftpgoPath] = vfPerms
 
 		// adding virtual folder
 		vf := sftpgoVF{
-			Name:        name,
-			MappedPath:  path,
-			QuotaSize:   0,
+			Name:        sftpgoPath,
+			MappedPath:  qnapPath,
 			Description: fmt.Sprintf("QNAP Share: %s", name),
 		}
 		vfs = append(vfs, vf)
 		rlog.WithFields(log.Fields{
-			"user":  req.Username,
-			"name":  name,
-			"path":  path,
-			"perms": vfPerms,
+			"user":        req.Username,
+			"name":        name,
+			"sftpgo_path": sftpgoPath,
+			"qnap_path":   qnapPath,
+			"perms":       vfPerms,
 		}).Debug("added virtual folder")
 	}
 

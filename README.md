@@ -18,16 +18,17 @@ Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and aut
 
 ## Configuration
 
-| Variable         | Default     | Description                                                |
-|------------------|-------------|------------------------------------------------------------|
-| `QNAP_HTTP`      | `https`     | Protocol to reach QNAP \(http\|https\).                    |
-| `QNAP_HOST`      | `127.0.0.1` | QNAP Web hostname or IP.                                   |
-| `QNAP_PORT`      | `443`       | QNAP Web port.                                             |
-| `QNAP_CHECKCERT` | `true`      | Verify QNAP TLS cert; set to `false` to skip verification. |
-| `AUTHGW_HTTPS`   | `false`     | HTTPS mode \(not implemented\).                            |
-| `AUTHGW_ADDR`    | `0.0.0.0`   | Bind address.                                              |
-| `AUTHGW_PORT`    | `9999`      | Listen port.                                               |
-| `LOG_LEVEL`      | `info`      | Log level \(allowed: trace\|debug\|info\|warn\|error\).    |
+| Variable          | Default          | Description                                                |
+|-------------------|------------------|------------------------------------------------------------|
+| `QNAP_HTTP`       | `https`          | Protocol to reach QNAP \(http\|https\).                    |
+| `QNAP_HOST`       | `127.0.0.1`      | QNAP Web hostname or IP.                                   |
+| `QNAP_PORT`       | `443`            | QNAP Web port.                                             |
+| `QNAP_CHECKCERT`  | `true`           | Verify QNAP TLS cert; set to `false` to skip verification. |
+| `QNAP_SHARE_PATH` | `/share/{name}/` | Absolute folder on QNAP where share is located at          |
+| `AUTHGW_HTTPS`    | `false`          | HTTPS mode \(not implemented\).                            |
+| `AUTHGW_ADDR`     | `0.0.0.0`        | Bind address.                                              |
+| `AUTHGW_PORT`     | `9999`           | Listen port.                                               |
+| `LOG_LEVEL`       | `info`           | Log level \(allowed: trace\|debug\|info\|warn\|error\).    |
 
 ## Notes
 - QNAP API calls time out after 10s.
