@@ -492,7 +492,10 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		Jar:     jar,
 		Timeout: HttpTimeout,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !QnapCheckCert},
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: !QnapCheckCert,
+				MinVersion:         tls.VersionTLS12,
+			},
 		},
 	}
 
