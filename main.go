@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -91,20 +93,21 @@ type shareNode struct {
 
 // authRequest is the incoming request from sftpgo (parameters which are used for this gateway)
 type authRequest struct {
-	Username            string `json:"username"`
-	Password            string `json:"password"`
-	Protocol            string `json:"protocol"` // SSH, FTP, DAV, HTTP
-	IP                  string `json:"ip"`
-	PublicKey           string `json:"public_key"`
-	KeyboardInteractive string `json:"keyboard_interactive"`
-	TlsCert             string `json:"tls_cert"`
+	Username            string      `json:"username"`
+	Password            SecureBytes `json:"password"`
+	Protocol            string      `json:"protocol"` // SSH, FTP, DAV, HTTP
+	IP                  string      `json:"ip"`
+	PublicKey           string      `json:"public_key"`
+	KeyboardInteractive string      `json:"keyboard_interactive"`
+	TlsCert             string      `json:"tls_cert"`
 }
 
 // sftpgoVF is a virtual folder in sftpgo
 type sftpgoVF struct {
 	ID          int    `json:"id,omitempty"`
 	Name        string `json:"name"`
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
+	VirtualPath string `json:"virtual_path"`
 	MappedPath  string `json:"mapped_path"`
 }
 
@@ -121,6 +124,88 @@ type sftpgoResponse struct {
 	Permissions    map[string][]string `json:"permissions,omitempty"`
 	Meta           map[string]string   `json:"meta,omitempty"`
 	Error          string              `json:"error,omitempty"`
+}
+
+// -----------------------------
+// Custom data type for secure bytes
+// -----------------------------
+
+// Ensure interface conformance at compile time.
+var _ encoding.TextUnmarshaler = (*SecureBytes)(nil)
+
+// SecureBytes is a byte slice used to store passwords in the database.
+type SecureBytes []byte
+
+// UnmarshalText lets encoding/json populate the bytes from a JSON string
+// without base64 decoding. The input is the unescaped string bytes.
+func (w *SecureBytes) UnmarshalText(text []byte) error {
+	*w = append((*w)[:0], text...) // copy so we control the memory
+	return nil
+}
+
+// Base64Encoded returns a base64‑encoded copy of the bytes.
+// It avoids creating a Go string, so the encoded data can be wiped.
+func (w *SecureBytes) Base64Encoded() []byte {
+	if w == nil || len(*w) == 0 {
+		return nil
+	}
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(*w)))
+	base64.StdEncoding.Encode(dst, *w)
+	runtime.KeepAlive(w) // ensure a source isn't optimized away prematurely
+	return dst
+}
+
+// WriteBase64To writes the base64 encoding to dst without creating an intermediate string.
+func (w *SecureBytes) WriteBase64To(dst io.Writer) error {
+	if w == nil || len(*w) == 0 {
+		return nil
+	}
+	enc := base64.NewEncoder(base64.StdEncoding, dst)
+	_, err := enc.Write(*w)
+	closeErr := enc.Close()
+	if err == nil {
+		err = closeErr
+	}
+	runtime.KeepAlive(w)
+	return err
+}
+
+// Wipe zeroes the memory in place and releases the slice.
+func (w *SecureBytes) Wipe() {
+	if w == nil {
+		log.Warn("Wipe called on nil SecureBytes")
+		return
+	}
+	for i := range *w {
+		(*w)[i] = 0
+	}
+	// Optionally, drop references.
+	*w = nil
+	runtime.KeepAlive(w) // prevent compiler from optimizing away
+}
+
+// String returns the string representation of the bytes.
+func (w *SecureBytes) String() string {
+	return "[REDACTED]"
+}
+
+// WipeBuffer is a custom Function to wipe buffers explicitly.
+// Helper function variant: call as WipeBuffer(&buf).
+func WipeBuffer(buf *bytes.Buffer) {
+	if buf == nil {
+		log.Warn("WipeBuffer called on nil buffer")
+		return
+	}
+	b := buf.Bytes()
+	if cap(b) > 0 {
+		bs := b[:cap(b)] // span full backing array from current start
+		for i := range bs {
+			bs[i] = 0
+		}
+	}
+	buf.Reset() // drop references
+	*buf = bytes.Buffer{}
+	runtime.KeepAlive(b) // ensure zeroing isn't optimized away
 }
 
 // -----------------------------
@@ -351,10 +436,29 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// limit body and decode
-	dec := json.NewDecoder(io.LimitReader(r.Body, MaxBodyBytes))
+	// limit request body size to MaxBodyBytes
+	r.Body = http.MaxBytesReader(w, r.Body, int64(MaxBodyBytes))
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			rlog.WithError(err).Warn("auth: failed to close request body")
+		}
+	}(r.Body)
+
+	// decode body
 	var req authRequest
-	if err := dec.Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// check if body exceeded MaxBodyBytes
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			// Body exceeded MaxBodyBytes
+			rlog.WithError(err).Warn("request body too large")
+			writeDeny(w, http.StatusRequestEntityTooLarge, "body_too_large",
+				fmt.Sprintf("request body too large (limit %d bytes)", MaxBodyBytes))
+			return
+		}
+
+		// otherwise it's a malformed JSON body'
 		rlog.WithError(err).Warn("malformed JSON body")
 		writeDeny(w, http.StatusBadRequest, "invalid_json", "malformed JSON body")
 		return
@@ -367,7 +471,8 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" || req.IP == "" {
+	// check if required parameters are present
+	if req.Username == "" || len(req.Password) == 0 || req.IP == "" {
 		rlog.Warn("missing required parameters")
 		writeDeny(w, http.StatusBadRequest, "missing_params", "missing required parameters")
 		return
@@ -399,7 +504,9 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 
 	// qnapLogin uses ctx to abort the request if timeout
 	rlog.Debug("initiating qnap login")
-	sid, err := qnapLogin(ctx, client, base, req.Username, req.Password)
+	sid, err := qnapLogin(ctx, client, base, req)
+	req.Password.Wipe() // Wipe password from memory
+
 	if err != nil {
 		// log and deny
 		// invalid credentials -> WARN (per policy)
@@ -570,19 +677,30 @@ func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message stri
 var errAuthFailed = errors.New("authentication failed")
 
 // qnapLogin authenticates a user with a QNAP device and returns the session ID if login is successful or an error otherwise.
-func qnapLogin(ctx context.Context, client *http.Client, baseURL string, user string, pass string) (string, error) {
-	enc := base64.StdEncoding.EncodeToString([]byte(pass))
+func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth authRequest) (string, error) {
+	user := auth.Username
 
 	loginURL := fmt.Sprintf("%s/cgi-bin/authLogin.cgi", baseURL)
+
+	// build request params
 	params := url.Values{}
 	params.Set("user", user)
-	params.Set("pwd", enc)
 	params.Set("serviceKey", "1")
 	params.Set("service", "1")
 
-	log.WithFields(log.Fields{"user": user}).Debug("calling qnap auth endpoint")
+	// build request body in byte buffer
+	// form-encode manually into a wipeable [] byte buffer
+	var buf bytes.Buffer
+	buf.WriteString(params.Encode())
+	buf.WriteString("&pwd=")
+	err := auth.Password.WriteBase64To(&buf)
+	if err != nil {
+		return "", err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, strings.NewReader(params.Encode()))
+	log.WithFields(log.Fields{"user": user}).Debug("calling qnap auth endpoint")
+	defer WipeBuffer(&buf) // wipe buffer from memory
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		return "", err
 	}
