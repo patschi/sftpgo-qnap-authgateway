@@ -316,7 +316,6 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 
 		// adding virtual folder
 		vf := sftpgoVF{
-			// ID:          1111,
 			Name:        name,
 			VirtualPath: sftpgoPath,
 			MappedPath:  qnapPath,

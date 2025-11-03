@@ -101,7 +101,6 @@ type qnapShareNode struct {
 
 // sftpgoVF is a virtual folder in sftpgo
 type sftpgoVF struct {
-	ID          int    `json:"id,omitempty"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	VirtualPath string `json:"virtual_path"`
