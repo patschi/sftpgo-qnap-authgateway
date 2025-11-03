@@ -487,7 +487,10 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info("auth request received")
 
 	// Create a per-request cookie jar and client (no shared cookies)
-	jar, _ := cookiejar.New(nil)
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		rlog.WithError(err).Error("failed to create cookie jar")
+	}
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HttpTimeout,
