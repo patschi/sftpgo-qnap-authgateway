@@ -617,7 +617,7 @@ func authHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate user expiry in 5 minutes in unix timestamp milliseconds
-	userExpiry := time.Now().Add(5*time.Minute).UnixNano() / 1000000
+	userExpiry := time.Now().Add(5 * time.Minute).UnixMilli()
 
 	// Respond success
 	resp := sftpgoResponse{
