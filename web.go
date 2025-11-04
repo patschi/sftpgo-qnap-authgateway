@@ -268,7 +268,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 	vfs := make([]sftpgoVF, 0, len(shares))
 
 	// Deny access to the root folder
-	perms["/"] = []string{"list"}
+	perms["/"] = SharePermsListOnly
 
 	// Check each QNAP share
 	for _, s := range shares {
@@ -306,7 +306,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 		qnapPath := strings.Replace(QnapSharePath, "{name}", name, 1)
 
 		// build permissions
-		var vfPerms = SharePermsDeny
+		var vfPerms = SharePermsDeny // default to deny
 		if s.Cls == "w" {
 			vfPerms = SharePermsReadWrite
 		} else if s.Cls == "r" {

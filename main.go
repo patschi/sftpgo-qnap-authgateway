@@ -51,11 +51,11 @@ var (
 	// QnapCheckCert defines if we should check certificates when accessing QNAP API
 	QnapCheckCert bool
 
-	// SharePermsDeny means no access on sftpgo folder
-	SharePermsDeny = []string{}
-	// SharePermsReadOnly is the default permissions for read-only shares
-	SharePermsReadOnly = []string{"list", "download"}
-	// SharePermsReadWrite is the default permissions for read-write shares
+
+	// Share Permission Definitions
+	SharePermsDeny      = []string{}
+	SharePermsListOnly  = []string{"list"}
+	SharePermsReadOnly  = []string{"list", "download"}
 	SharePermsReadWrite = []string{"*"}
 )
 
