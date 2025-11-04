@@ -39,18 +39,26 @@ const (
 )
 
 var (
-	// QnapHttp defines the protocol to use for QNAP API calls
-	QnapHttp string
-	// QnapHost defines the host to use for QNAP API calls
-	QnapHost string
-	// QnapPort defines the port to use for QNAP API calls
-	QnapPort string
+	// QnapUrl defines the full URL to use for QNAP API calls
+	// (example: https://10.0.0.100)
+	QnapUrl string
+	// QnapCheckCert defines if the certificate of QNAP should be checked when accessing QNAP API
+	QnapCheckCert bool
 	// QnapSharePath defines a path for QNAP shares where the share is located
 	// (example: /share/{path}/; as in /share/Public)
 	QnapSharePath string
-	// QnapCheckCert defines if we should check certificates when accessing QNAP API
-	QnapCheckCert bool
 
+	// SftpgoApiUrl is the URL of the sftpgo API
+	// (only https://sftpgo.example.com; do NOT include the /api/ prefix)
+	SftpgoApiUrl string
+	// SftpgoCheckCert defines if the certificate of sftpgo should be checked when accessing sftpgo REST API
+	SftpgoCheckCert bool
+	// SftpgoApiToken is the token to use for authentication with the sftpgo API
+	SftpgoApiToken string
+	// SftpgoVirtualFolderSync is a flag to enable/disable virtual folder sync after successful
+	// authentication to QNAP NAS: When enabled, it will create, delete or update virtual folders
+	// in sftpgo based on the shares accessible for specific user during time of login.
+	SftpgoVirtualFolderSync bool
 
 	// Share Permission Definitions
 	SharePermsDeny      = []string{}
@@ -254,20 +262,49 @@ func init() {
 
 func main() {
 	// Initialize values and read from environment variables
-	QnapHttp = getEnv("QNAP_HTTP", "https")
-	QnapHost = getEnv("QNAP_HOST", "127.0.0.1")
-	QnapPort = getEnv("QNAP_PORT", "443")
+
+	// QNAP API
+	QnapUrl = getEnv("QNAP_URL", "https://host.docker.internal")
+	QnapUrl = strings.TrimSpace(strings.TrimSuffix(QnapUrl, "/"))
 
 	QnapSharePath = getEnv("QNAP_SHARE_PATH", "/share/{name}/")
 	QnapSharePath = strings.TrimSpace(QnapSharePath)
 
-	QnapCheckCertStr := getEnv("QNAP_CHECKCERT", "true")
-	QnapCheckCert = false
-	if strings.ToLower(strings.TrimSpace(QnapCheckCertStr)) == "true" {
-		QnapCheckCert = true
+	QnapCheckCertStr := getEnv("QNAP_CHECK_CERT", "true")
+	QnapCheckCert = true
+	if strings.ToLower(strings.TrimSpace(QnapCheckCertStr)) == "false" {
+		QnapCheckCert = false
+		log.Warn("QNAP_CHECK_CERT is disabled and certificate of QNAP is not validated. " +
+			"Not recommended for production!")
 	}
-	log.WithField("state", QnapCheckCert).Info("QNAP API certificate check state")
 
+	// sftpgo API
+
+	SftpgoApiUrl = getEnv("SFTPGO_API_URL", "http://host.docker.internal:8080")
+	SftpgoApiUrl = strings.TrimSpace(strings.TrimSuffix(SftpgoApiUrl, "/"))
+
+	SftpgoApiToken = getEnv("SFTPGO_API_TOKEN", "")
+
+	SftpgoVirtualFolderSyncStr := getEnv("SFTPGO_FOLDER_SYNC", "false")
+	SftpgoVirtualFolderSync = false
+	if strings.ToLower(strings.TrimSpace(SftpgoVirtualFolderSyncStr)) == "true" {
+		SftpgoVirtualFolderSync = true
+		log.WithField("state", SftpgoVirtualFolderSync).Info("SFTPGO virtual folder sync state")
+	}
+
+	if SftpgoVirtualFolderSync && SftpgoApiToken == "" {
+		log.Fatal("SFTPGO_API_TOKEN is not set, but SFTPGO_FOLDER_SYNC is enabled")
+	}
+
+	SftpgoCheckCertStr := getEnv("SFTPGO_CHECK_CERT", "true")
+	SftpgoCheckCert = true
+	if strings.ToLower(strings.TrimSpace(SftpgoCheckCertStr)) == "false" {
+		SftpgoCheckCert = false
+		log.Warn("SFTPGO_CHECK_CERT is disabled and certificate of sftpgo is not validated. " +
+			"Not recommended for production!")
+	}
+
+	// Auth Gateway configuration
 	AuthGwHttps := getEnv("AUTHGW_HTTPS", "false")
 	AuthGwAddr := getEnv("AUTHGW_ADDR", "0.0.0.0")
 	AuthGwPort := getEnv("AUTHGW_PORT", "9999")
@@ -296,7 +333,8 @@ func main() {
 	go func() {
 		log.WithFields(log.Fields{
 			"authgw": fmt.Sprintf("%s://%s:%s%s", AuthGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
-			"qnap":   fmt.Sprintf("%s://%s:%s", QnapHttp, QnapHost, QnapPort),
+			"qnap":   QnapUrl,
+			"sftpgo": SftpgoApiUrl,
 		}).Info("starting QNAP auth gateway")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Errorf("HTTP server error: %v", err)
@@ -308,7 +346,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
-	log.Info("shutdown signal received, stopping http server")
+	log.Info("shutdown signal received, stopping...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

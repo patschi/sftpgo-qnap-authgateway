@@ -182,11 +182,9 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), HttpTimeout)
 	defer cancel()
 
-	base := fmt.Sprintf("%s://%s:%s", QnapHttp, QnapHost, QnapPort)
-
 	// qnapLogin uses ctx to abort the request if timeout
 	authLog.Debug("initiating qnap login")
-	sid, err := qnapLogin(ctx, client, base, req)
+	sid, err := qnapLogin(ctx, client, QnapUrl, req)
 	req.Password.Wipe() // Wipe password from memory
 
 	if err != nil {
@@ -205,7 +203,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	authLog.Info("qnap login workflow reported success")
 
 	// Fetch shares
-	shares, err := qnapGetShares(ctx, client, base, sid, req.Username)
+	shares, err := qnapGetShares(ctx, client, QnapUrl, sid, req.Username)
 	if err != nil {
 		authLog.WithError(err).Errorf("failed to fetch shares for user")
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
@@ -220,7 +218,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Logout user from QNAP
 	authLog.Debug("Logging user out of QNAP API...")
-	if err := qnapLogout(ctx, client, base, sid); err != nil {
+	if err := qnapLogout(ctx, client, QnapUrl, sid); err != nil {
 		authLog.WithError(err).Errorf("failed to logout of qnap. proceeding...")
 	} else {
 		authLog.Info("Destroyed login session for user in QNAP API")
