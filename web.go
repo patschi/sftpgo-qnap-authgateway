@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,11 +15,27 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"runtime"
 	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// -----------------------------
+// Types for auth gateway
+// -----------------------------
+
+// authRequest is the incoming request from sftpgo (parameters which are used for this gateway)
+type authRequest struct {
+	Username            string      `json:"username"`
+	Password            SecureBytes `json:"password"`
+	Protocol            string      `json:"protocol"` // SSH, FTP, DAV, HTTP
+	IP                  string      `json:"ip"`
+	PublicKey           string      `json:"public_key"`
+	KeyboardInteractive string      `json:"keyboard_interactive"`
+	TlsCert             string      `json:"tls_cert"`
+}
 
 // HttpServerMiddleware takes care of transparent logging and request-id
 func HttpServerMiddleware(next http.Handler) http.Handler {
@@ -395,4 +414,86 @@ func shortRequestID(n int) string {
 		return time.Now().Format("150405.000") // HHMMSS.milliseconds
 	}
 	return hex.EncodeToString(b)
+}
+
+// -----------------------------
+// Custom data type for secure bytes
+// -----------------------------
+
+// Ensure interface conformance at compile time.
+var _ encoding.TextUnmarshaler = (*SecureBytes)(nil)
+
+// SecureBytes is a byte slice used to store passwords in the database.
+type SecureBytes []byte
+
+// UnmarshalText lets encoding/json populate the bytes from a JSON string
+// without base64 decoding. The input is the unescaped string bytes.
+func (w *SecureBytes) UnmarshalText(text []byte) error {
+	*w = append((*w)[:0], text...) // copy so we control the memory
+	return nil
+}
+
+// Base64Encoded returns a base64‑encoded copy of the bytes.
+// It avoids creating a Go string, so the encoded data can be wiped.
+func (w *SecureBytes) Base64Encoded() []byte {
+	if w == nil || len(*w) == 0 {
+		return nil
+	}
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(*w)))
+	base64.StdEncoding.Encode(dst, *w)
+	runtime.KeepAlive(w) // ensure a source isn't optimized away prematurely
+	return dst
+}
+
+// WriteBase64To writes the base64 encoding to dst without creating an intermediate string.
+func (w *SecureBytes) WriteBase64To(dst io.Writer) error {
+	if w == nil || len(*w) == 0 {
+		return nil
+	}
+	enc := base64.NewEncoder(base64.StdEncoding, dst)
+	_, err := enc.Write(*w)
+	closeErr := enc.Close()
+	if err == nil {
+		err = closeErr
+	}
+	runtime.KeepAlive(w)
+	return err
+}
+
+// Wipe zeroes the memory in place and releases the slice.
+func (w *SecureBytes) Wipe() {
+	if w == nil {
+		log.Warn("Wipe called on nil SecureBytes")
+		return
+	}
+	for i := range *w {
+		(*w)[i] = 0
+	}
+	// Optionally, drop references.
+	*w = nil
+	runtime.KeepAlive(w) // prevent compiler from optimizing away
+}
+
+// String returns the string representation of the bytes.
+func (w *SecureBytes) String() string {
+	return "[REDACTED]"
+}
+
+// WipeBuffer is a custom Function to wipe buffers explicitly.
+// Helper function variant: call as WipeBuffer(&buf).
+func WipeBuffer(buf *bytes.Buffer) {
+	if buf == nil {
+		log.Warn("WipeBuffer called on nil buffer")
+		return
+	}
+	b := buf.Bytes()
+	if cap(b) > 0 {
+		bs := b[:cap(b)] // span full backing array from the current start
+		for i := range bs {
+			bs[i] = 0
+		}
+	}
+	buf.Reset() // drop references
+	*buf = bytes.Buffer{}
+	runtime.KeepAlive(b) // ensure zeroing isn't optimized away
 }

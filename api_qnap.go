@@ -16,6 +16,27 @@ import (
 )
 
 // -----------------------------
+// Types for QNAP responses
+// -----------------------------
+
+// qnapLoginResp is the response from QNAP API for login requests
+type qnapLoginResp struct {
+	XMLName    xml.Name `xml:"QDocRoot"`
+	AuthPassed string   `xml:"authPassed"`
+	AuthSid    string   `xml:"authSid"`
+	ErrorValue string   `xml:"errorValue"`
+}
+
+// qnapShareNode is a single shared folder
+type qnapShareNode struct {
+	Text         string `json:"text"`
+	ID           string `json:"id"`
+	Cls          string `json:"cls"`
+	IconCls      string `json:"iconCls"`
+	NoSupportACL int    `json:"noSupportACL"`
+}
+
+// -----------------------------
 // QNAP helpers
 // Each uses ctx; the client is per-request and has its own cookiejar.
 // -----------------------------
