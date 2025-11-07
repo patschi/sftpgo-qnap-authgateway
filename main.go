@@ -31,6 +31,12 @@ const (
 	HttpTimeout = 10 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
 	MaxBodyBytes = 2 * 1024 // 2 KiB
+
+	// QnapSharePrefix is the prefix that will be added for every share name
+	// This will be used as a human-readable identifier for the share in sftpgo
+	QnapSharePrefix = "QNAP_SHARE_"
+	// SftpgoManagedFolderDesc is the description text that will be added to every share description
+	SftpgoManagedFolderDesc = "QNAP Share: %s"
 )
 
 var (
@@ -142,7 +148,7 @@ func main() {
 			"sftpgo": SftpgoApiUrl,
 		}).Info("starting QNAP auth gateway")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Errorf("HTTP server error: %v", err)
+			log.WithError(err).Fatal("error starting HTTP server")
 			os.Exit(1)
 		}
 	}()
