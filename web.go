@@ -185,6 +185,9 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		userLog.WithError(err).Error("failed to create cookie jar")
+		writeDeny(w, http.StatusInternalServerError, "internal_error",
+			"failed to initialize authentication")
+		return
 	}
 	client := &http.Client{
 		Jar:     jar,
@@ -356,15 +359,15 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoFo
 			authLog.WithField("name", name).Warn("empty share name, using ID instead")
 		}
 		name = QnapSharePrefix + strings.TrimSpace(name)
-		name = strings.Replace(name, "/", "_", -1)
-		name = strings.Replace(name, " ", "_", -1)
+		name = strings.ReplaceAll(name, "/", "_")
+		name = strings.ReplaceAll(name, " ", "_")
 
 		// Build paths for virtual folder and QNAP
 		sftpgoPath := strings.TrimSpace(s.ID)
 
 		qnapPath := strings.TrimSpace(QnapSharePath)
-		qnapPath = strings.Replace(qnapPath, "{name}", s.ID, -1)
-		qnapPath = strings.Replace(qnapPath, "//", "/", -1)
+		qnapPath = strings.ReplaceAll(qnapPath, "{name}", s.ID)
+		qnapPath = strings.ReplaceAll(qnapPath, "//", "/")
 
 		// build permissions
 		var vfPerms = SharePermsDeny // default to deny
@@ -462,7 +465,7 @@ func shortRequestID(n int) string {
 // Ensure interface conformance at compile time.
 var _ encoding.TextUnmarshaler = (*SecureBytes)(nil)
 
-// SecureBytes is a byte slice used to store passwords in the database.
+// SecureBytes is a byte slice used for in-memory password handling during authentication requests.
 type SecureBytes []byte
 
 // UnmarshalText lets encoding/json populate the bytes from a JSON string
@@ -518,7 +521,7 @@ func (w *SecureBytes) String() string {
 	return "[REDACTED]"
 }
 
-// WipeBuffer is a custom Function to wipe buffers explicitly.
+// WipeBuffer is a custom function to wipe buffers explicitly.
 // Helper function variant: call as WipeBuffer(&buf).
 func WipeBuffer(buf *bytes.Buffer) {
 	if buf == nil {

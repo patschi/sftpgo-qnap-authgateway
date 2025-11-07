@@ -71,6 +71,7 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 	if err != nil {
 		return "", err
 	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
@@ -84,7 +85,12 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 			log.WithError(err).Error("login: failed to close response body")
 		}
 	}(resp.Body)
-	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	bodyBytes, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		log.WithError(readErr).Error("login: failed to read response body")
+		return "", fmt.Errorf("failed to read response body: %w", readErr)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		// treat non-200 as auth failure for credential issues or QNAP errors differently
@@ -131,6 +137,7 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
@@ -146,7 +153,10 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("logout failed HTTP %d: unable to read response body: %v", resp.StatusCode, err)
+		}
 		return fmt.Errorf("logout failed HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -174,6 +184,7 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
@@ -186,7 +197,12 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 			log.WithField("user", user).WithError(err).Error("getShares: failed to close response body")
 		}
 	}(resp.Body)
-	body, _ := io.ReadAll(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.WithField("user", user).WithError(err).Error("getShares: failed to read response body")
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
 
 	log.WithFields(log.Fields{
 		"user": user,
