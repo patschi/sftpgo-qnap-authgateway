@@ -23,8 +23,8 @@ type sftpgoVirtualFolder struct {
 	Permission  []string `json:"-"`
 }
 
-// sftpgoFolder is a single virtual folder in sftpgo
-type sftpgoFolder struct {
+// sftpgoBackendFolder is a single virtual folder in sftpgo
+type sftpgoBackendFolder struct {
 	Name        string                  `json:"name"`
 	Description string                  `json:"description,omitempty"`
 	MappedPath  string                  `json:"mapped_path"`
@@ -57,7 +57,7 @@ type sftpgoResponse struct {
 // sftpgoSyncFolders is the main function to sync virtual folders with sftpgo REST API
 // It will authenticate towards sftpgo REST API, create/update/delete folders as necessary,
 // and logout. It returns a list of folders that could not be processed/synced.
-func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoFolder) ([]string, error) {
+func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]string, error) {
 	// Remember all folders that could not be processed/synced
 	failedFolders := make([]string, 0)
 
@@ -108,7 +108,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoFolder) ([]string,
 
 // sftpgoProcessFolder is processing and taking care of single folders. It will create/update as necessary.
 // It returns an error if something went wrong.
-func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desiredFolder sftpgoFolder) error {
+func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desiredFolder sftpgoBackendFolder) error {
 	name := desiredFolder.Name
 	log.WithField("folder", name).Debug("processing folder")
 
@@ -223,7 +223,7 @@ func sftpgoLogout(log *log.Entry, client *http.Client, token string) (int, error
 }
 
 // sftpgoCreateFolder creates a virtual folder in sftpgo REST API. It returns an error if any.
-func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoFolder) error {
+func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("sftpgo create folder: failed to marshal folder payload")
@@ -262,11 +262,11 @@ func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folde
 // sftpgoGetFolder retrieves a specific virtual folder by name from sftpgo REST API.
 // It returns the folder, HTTP status code, and error if any. The folder is returned as a struct.
 // HTTP Error 404 means folder does not exist.
-func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (sftpgoFolder, int, error) {
+func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoApiUrl, name)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return sftpgoFolder{}, 400, err
+		return sftpgoBackendFolder{}, 400, err
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -274,7 +274,7 @@ func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (s
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return sftpgoFolder{}, 400, err
+		return sftpgoBackendFolder{}, 400, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -285,22 +285,22 @@ func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (s
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return sftpgoFolder{}, resp.StatusCode, fmt.Errorf("get folder failed: %s", string(body))
+		return sftpgoBackendFolder{}, resp.StatusCode, fmt.Errorf("get folder failed: %s", string(body))
 	}
 
 	body, _ := io.ReadAll(resp.Body)
 	log.WithField("folder", string(body)).Info("fetched folder details")
 
-	var folder sftpgoFolder
+	var folder sftpgoBackendFolder
 	if err := json.Unmarshal(body, &folder); err != nil {
 		log.WithError(err).Error("failed to unmarshal folder details")
-		return sftpgoFolder{}, 400, err
+		return sftpgoBackendFolder{}, 400, err
 	}
 	return folder, 200, nil
 }
 
 // sftpgoUpdateFolder updates a virtual folder in sftpgo REST API with struct provided. It returns an error if any.
-func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoFolder) error {
+func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("failed to marshal folder for update")
@@ -339,8 +339,8 @@ func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folde
 
 // --- Helper functions
 
-// folderStructsEqual compares two sftpgoFolder structs recursively.
-func folderStructsEqual(log *log.Entry, a sftpgoFolder, b sftpgoFolder) bool {
+// folderStructsEqual compares two sftpgoBackendFolder structs recursively.
+func folderStructsEqual(log *log.Entry, a sftpgoBackendFolder, b sftpgoBackendFolder) bool {
 	log.WithField("a", fmt.Sprintf("%v", a)).WithField("b", fmt.Sprintf("%v", b)).Trace("comparing folders")
 
 	if a.Name != b.Name || a.Description != b.Description || a.MappedPath != b.MappedPath {

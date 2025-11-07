@@ -126,7 +126,7 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 // It takes a context and HTTP client as parameters.
 // Returns an error in case of failure.
 func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid string) error {
-	log.WithField("sid", sid).Trace("Destroying session on QNAP API")
+	log.WithField("sid", sid).Trace("destroying session on QNAP API")
 
 	logoutURL := fmt.Sprintf("%s/cgi-bin/authLogout.cgi", baseURL)
 
@@ -160,7 +160,7 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 		return fmt.Errorf("logout failed HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
-	log.WithField("sid", sid).Trace("User session destroyed on QNAP API")
+	log.WithField("sid", sid).Trace("user session destroyed on QNAP API")
 	return nil
 }
 

@@ -53,7 +53,7 @@ func HttpServerMiddleware(next http.Handler) http.Handler {
 			"user_agent": r.UserAgent(),
 			"path":       r.URL.Path,
 			"request_ip": ip,
-		}).Debug("incoming request")
+		}).Debug("incoming authentication request")
 
 		// Create a logger with request fields
 		logger := log.WithFields(log.Fields{
@@ -69,7 +69,7 @@ func HttpServerMiddleware(next http.Handler) http.Handler {
 		log.WithFields(log.Fields{
 			"request_id": requestID,
 			"duration":   time.Since(start),
-		}).Debug("done handling request")
+		}).Debug("done handling authentication request")
 	})
 }
 
@@ -239,18 +239,18 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info("accessible shares retrieved")
 
 	// Logout user from QNAP
-	userLog.Debug("Logging user out of QNAP API...")
+	userLog.Debug("logging user out of QNAP API...")
 	if err := qnapLogout(ctx, client, QnapUrl, sid); err != nil {
 		userLog.WithError(err).Errorf("failed to logout of qnap. proceeding...")
 	} else {
-		userLog.Info("Destroyed login session for user in QNAP API")
+		userLog.Info("destroyed login session for user in QNAP API")
 	}
 
 	// Build virtual folders and permissions
 	folders, virtualFolders := buildVirtualFolders(userLog, shares)
 
 	// Initiate sftpgo virtual folder sync
-	log.WithField("folders", folders).Debug("folders")
+	log.WithField("folders", folders).Trace("all folders")
 	failedFolders, err := sftpgoSyncFolders(userLog, folders)
 	if err != nil {
 		userLog.WithError(err).Error("failed to sync folders, denying login")
@@ -322,10 +322,10 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.
 // It returns a map of permissions and a slice of virtual folders.
-func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoFolder, []sftpgoVirtualFolder) {
+func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
 
 	// Build virtual folders
-	folders := make([]sftpgoFolder, 0, len(shares))
+	folders := make([]sftpgoBackendFolder, 0, len(shares))
 	virtualFolders := make([]sftpgoVirtualFolder, 0, len(shares))
 
 	// Check each QNAP share
@@ -378,7 +378,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoFo
 		}
 
 		// adding sftpgo folder
-		folder := sftpgoFolder{
+		folder := sftpgoBackendFolder{
 			Name:        name,
 			MappedPath:  qnapPath,
 			Description: fmt.Sprintf(SftpgoManagedFolderDesc, s.Text),
