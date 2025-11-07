@@ -50,7 +50,7 @@ func HttpServerMiddleware(next http.Handler) http.Handler {
 		log.WithFields(log.Fields{
 			"request_id": requestID,
 			"duration":   time.Since(start),
-		}).Debug("handled request")
+		}).Debug("done handling request")
 	})
 }
 

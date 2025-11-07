@@ -39,6 +39,13 @@ const (
 )
 
 var (
+	// AuthGwAddr defines to which address it's binding it on
+	AuthGwAddr string
+	// AuthGwPort defines to which port it's binding it on'
+	AuthGwPort string
+	// AuthGwHttps defines if it's running in HTTPS mode or not'
+	AuthGwHttps bool
+
 	// QnapUrl defines the full URL to use for QNAP API calls
 	// (example: https://10.0.0.100)
 	QnapUrl string
@@ -273,6 +280,60 @@ func init() {
 }
 
 func main() {
+	// Load all settings, primarily from environment variables
+	loadSettings()
+
+	// HTTP server mux and handler
+	mux := http.NewServeMux()
+	mux.HandleFunc(AuthPath, webAuthHandler)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
+		Handler: HttpServerMiddleware(mux),
+
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Check if we are running in HTTPS mode
+	AuthGwScheme := "http"
+	if AuthGwHttps {
+		AuthGwScheme = "https"
+		log.Fatal("not yet implemented")
+	} else {
+		log.Warn("running in HTTP mode. not secure. not recommended for production!")
+	}
+
+	// Start server in goroutine
+	go func() {
+		log.WithFields(log.Fields{
+			"authgw": fmt.Sprintf("%s://%s:%s%s", AuthGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
+			"qnap":   QnapUrl,
+			"sftpgo": SftpgoApiUrl,
+		}).Info("starting QNAP auth gateway")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Errorf("HTTP server error: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	// graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+	log.Info("shutdown signal received, stopping...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.WithError(err).Errorf("http server shutdown error")
+	} else {
+		log.Info("http server stopped gracefully")
+	}
+}
+
+func loadSettings() {
 	// Initialize values and read from environment variables
 
 	// QNAP API
@@ -316,54 +377,12 @@ func main() {
 	}
 
 	// Auth Gateway configuration
-	AuthGwHttps := getEnv("AUTHGW_HTTPS", "false")
-	AuthGwAddr := getEnv("AUTHGW_ADDR", "0.0.0.0")
-	AuthGwPort := getEnv("AUTHGW_PORT", "9999")
-
-	// Check if we are running in HTTPS mode
-	AuthGwScheme := "http"
-	if AuthGwHttps == "true" {
-		AuthGwScheme = "https"
-		log.Fatal("not yet implemented")
+	AuthGwHttps = false
+	AuthGwHttpsStr := getEnv("AUTHGW_HTTPS", "false")
+	if strings.ToLower(strings.TrimSpace(AuthGwHttpsStr)) == "true" {
+		AuthGwHttps = true
 	}
 
-	// HTTP server mux and handler
-	mux := http.NewServeMux()
-	mux.HandleFunc(AuthPath, webAuthHandler)
-
-	server := &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
-		Handler: HttpServerMiddleware(mux),
-
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Start server in goroutine
-	go func() {
-		log.WithFields(log.Fields{
-			"authgw": fmt.Sprintf("%s://%s:%s%s", AuthGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
-			"qnap":   QnapUrl,
-			"sftpgo": SftpgoApiUrl,
-		}).Info("starting QNAP auth gateway")
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Errorf("HTTP server error: %v", err)
-			os.Exit(1)
-		}
-	}()
-
-	// graceful shutdown
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
-	log.Info("shutdown signal received, stopping...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.WithError(err).Errorf("http server shutdown error")
-	} else {
-		log.Info("http server stopped gracefully")
-	}
+	AuthGwAddr = getEnv("AUTHGW_ADDR", "0.0.0.0")
+	AuthGwPort = getEnv("AUTHGW_PORT", "9999")
 }
