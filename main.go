@@ -30,7 +30,7 @@ const (
 	// HttpTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
 	HttpTimeout = 7 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
-	MaxBodyBytes = 2 * 1024 // 2 KiB
+	MaxBodyBytes = 5 * 1024 // 5 KiB
 
 	// QnapSharePrefix is the prefix that will be added for every share name
 	// This will be used as a human-readable identifier for the share in sftpgo
