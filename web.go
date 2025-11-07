@@ -244,11 +244,51 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build virtual folders and permissions
-	perms, folders, virtualFolders := buildVirtualFolders(userLog, shares)
+	folders, virtualFolders := buildVirtualFolders(userLog, shares)
+
+	// Initiate sftpgo virtual folder sync
+	log.WithField("folders", folders).Debug("folders")
+	failedFolders, err := sftpgoSyncFolders(userLog, folders)
+	if err != nil {
+		userLog.WithError(err).Error("failed to sync folders, denying login")
+		writeDeny(w, http.StatusInternalServerError, "sync_folders_failed",
+			"failed to sync folders")
+		return
+	}
+	// Remove any failed folders from virtualFolders
+	if len(failedFolders) > 0 {
+		userLog.WithField("folders", failedFolders).Warn("failed to sync folders, denying access to affected")
+
+		// Create a set of failed folder names for O(1) lookup
+		failedSet := make(map[string]struct{}, len(failedFolders))
+		for _, name := range failedFolders {
+			failedSet[name] = struct{}{}
+		}
+
+		// Filter out failed folders
+		filteredFolders := virtualFolders[:0]
+		for _, vf := range virtualFolders {
+			if _, isFailed := failedSet[vf.Name]; !isFailed {
+				filteredFolders = append(filteredFolders, vf)
+			}
+		}
+		virtualFolders = filteredFolders
+	}
+	userLog.Info("sftpgo virtual folders synced")
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
 	userExpiry := time.Now().Add(5 * time.Minute).UnixMilli()
+
+	// Build permissions map
+	perms := make(map[string][]string, len(virtualFolders)+1)
+
+	// Default permission to the root folder by default
+	perms["/"] = SharePermsListOnly
+
+	for i := range virtualFolders {
+		perms[virtualFolders[i].VirtualPath] = virtualFolders[i].Permission
+	}
 
 	// Build response success
 	resp := sftpgoResponse{
@@ -260,7 +300,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		Permissions:    perms,
 	}
 
-	// Encode response as JSON and return to client
+	// Encode response as JSON and return to the client
 	data, err := json.Marshal(resp)
 	if err != nil {
 		userLog.WithError(err).Error("failed to encode success response")
@@ -279,16 +319,11 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.
 // It returns a map of permissions and a slice of virtual folders.
-func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string][]string,
-	[]sftpgoFolder, []sftpgoVirtualFolder) {
+func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoFolder, []sftpgoVirtualFolder) {
 
 	// Build virtual folders
-	perms := make(map[string][]string, len(shares)+1)
 	folders := make([]sftpgoFolder, 0, len(shares))
 	virtualFolders := make([]sftpgoVirtualFolder, 0, len(shares))
-
-	// Deny access to the root folder
-	perms["/"] = SharePermsListOnly
 
 	// Check each QNAP share
 	for _, s := range shares {
@@ -314,16 +349,22 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 		}
 
 		// build virtual folder
+		// the name is the link between "backend" and "frontend" folder
 		name := s.Text
 		if name == "" {
 			name = strings.Trim(s.ID, "/")
 			authLog.WithField("name", name).Warn("empty share name, using ID instead")
 		}
-		name = strings.TrimSpace(name)
+		name = QnapSharePrefix + strings.TrimSpace(name)
+		name = strings.Replace(name, "/", "_", -1)
+		name = strings.Replace(name, " ", "_", -1)
 
 		// Build paths for virtual folder and QNAP
 		sftpgoPath := strings.TrimSpace(s.ID)
-		qnapPath := strings.Replace(QnapSharePath, "{name}", name, 1)
+
+		qnapPath := strings.TrimSpace(QnapSharePath)
+		qnapPath = strings.Replace(qnapPath, "{name}", s.ID, -1)
+		qnapPath = strings.Replace(qnapPath, "//", "/", -1)
 
 		// build permissions
 		var vfPerms = SharePermsDeny // default to deny
@@ -332,13 +373,12 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 		} else if s.Cls == "r" {
 			vfPerms = SharePermsReadOnly
 		}
-		perms[sftpgoPath] = vfPerms
 
 		// adding sftpgo folder
 		folder := sftpgoFolder{
-			Name:        QnapSharePrefix + name,
+			Name:        name,
 			MappedPath:  qnapPath,
-			Description: fmt.Sprintf(SftpgoManagedFolderDesc, name),
+			Description: fmt.Sprintf(SftpgoManagedFolderDesc, s.Text),
 			Filesystem: &sftpgoFolderFilesystem{
 				Provider: 0,
 			},
@@ -349,6 +389,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 		virtualFolder := sftpgoVirtualFolder{
 			Name:        name,
 			VirtualPath: sftpgoPath,
+			Permission:  vfPerms,
 		}
 		virtualFolders = append(virtualFolders, virtualFolder)
 
@@ -358,10 +399,10 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) (map[string
 			"sftpgo_path": sftpgoPath,
 			"qnap_path":   qnapPath,
 			"perms":       vfPerms,
-		}).Debug("added virtual folder")
+		}).Debug("added qnap share")
 	}
 
-	return perms, folders, virtualFolders
+	return folders, virtualFolders
 }
 
 // -----------------------------

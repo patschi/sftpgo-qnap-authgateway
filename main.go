@@ -27,8 +27,8 @@ const (
 
 	// AuthPath server listen address and endpoint
 	AuthPath = "/auth"
-	// HttpTimeout defines HTTP client timeout for requests to QNAP API
-	HttpTimeout = 10 * time.Second
+	// HttpTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
+	HttpTimeout = 7 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
 	MaxBodyBytes = 2 * 1024 // 2 KiB
 
@@ -61,8 +61,10 @@ var (
 	SftpgoApiUrl string
 	// SftpgoCheckCert defines if the certificate of sftpgo should be checked when accessing sftpgo REST API
 	SftpgoCheckCert bool
-	// SftpgoApiToken is the token to use for authentication with the sftpgo API
-	SftpgoApiToken string
+	// SftpgoApiUser is the username to use for authentication with the sftpgo API
+	SftpgoApiUser string
+	// SftpgoApiPass is the password to use for authentication with the sftpgo API
+	SftpgoApiPass string
 	// SftpgoVirtualFolderSync is a flag to enable/disable virtual folder sync after successful
 	// authentication to QNAP NAS: When enabled, it will create, delete or update virtual folders
 	// in sftpgo based on the shares accessible for specific user during time of login.
@@ -172,7 +174,7 @@ func main() {
 func loadSettings() {
 	// --- QNAP API Configuration ---
 	QnapUrl = normalizeURL(getEnv("QNAP_URL", "https://host.docker.internal"))
-	QnapSharePath = strings.TrimSpace(getEnv("QNAP_SHARE_PATH", "/share/{name}/"))
+	QnapSharePath = strings.TrimSpace(strings.TrimSuffix(getEnv("QNAP_SHARE_PATH", "/share/{name}"), "/"))
 
 	QnapCheckCert = parseBoolEnv("QNAP_CHECK_CERT", true)
 	if !QnapCheckCert {
@@ -182,13 +184,14 @@ func loadSettings() {
 
 	// --- SFTPGo API Configuration ---
 	SftpgoApiUrl = normalizeURL(getEnv("SFTPGO_API_URL", "http://host.docker.internal:8080"))
-	SftpgoApiToken = getEnv("SFTPGO_API_TOKEN", "")
+	SftpgoApiUser = getEnv("SFTPGO_API_USER", "sa-qnap-authgw")
+	SftpgoApiPass = getEnv("SFTPGO_API_PASS", "")
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
 	log.WithField("state", SftpgoVirtualFolderSync).Info("SFTPGO virtual folder sync state")
 
-	if SftpgoVirtualFolderSync && SftpgoApiToken == "" {
-		log.Fatal("SFTPGO_API_TOKEN is not set, but SFTPGO_FOLDER_SYNC is enabled")
+	if SftpgoVirtualFolderSync && SftpgoApiPass == "" {
+		log.Fatal("SFTPGO_API_PASS is not set, but SFTPGO_FOLDER_SYNC is enabled!")
 	}
 
 	SftpgoCheckCert = parseBoolEnv("SFTPGO_CHECK_CERT", true)
