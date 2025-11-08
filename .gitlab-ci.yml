@@ -6,16 +6,214 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
-stages:
-  - test
-
 variables:
+  GO_VERSION: "1.25"            # set your preferred Go version
+  GOPATH: "$CI_PROJECT_DIR/.go"
+  GO_BIN_DIR: "bin"
+  GO_MAIN_DIR: "."              # relative path to your main package
+  GO_BUILD_ARGS: ""
+  GO_COVER_PACKAGES: ""
+  GO_BUILD_NAME: "$CI_PROJECT_NAME"
   SECRET_DETECTION_ENABLED: 'true'
-  GITLAB_ADVANCED_SAST_ENABLED: 'true'
+  GITLAB_ADVANCED_SAST_ENABLED: 'false'
+  CI_APPLICATION_REPOSITORY: "$CI_REGISTRY_IMAGE"
+  CI_APPLICATION_TAG: 'latest'
 
 secret_detection:
-  stage: test
+  stage: go-test
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
   - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+
+stages:
+  - prepare
+  - go-lint
+  - go-test
+  - build-app
+  - build-container
+  - test
+
+# Download dependencies
+go_mod_download:
+  image: "golang:${GO_VERSION}-alpine"
+  stage: prepare
+  script:
+    - mkdir -p $GOPATH
+    - go mod download
+  cache:
+    key: "${CI_PROJECT_NAME}-go"
+    paths:
+      - .go/pkg/mod/
+  artifacts:
+    paths:
+      - .go/pkg/mod/
+  rules:
+    - exists:
+        - '**/go.sum'
+
+# Lint code
+go_lint:
+  image: "golangci/golangci-lint:latest-alpine"
+  stage: go-lint
+  needs: [ ]
+  rules:
+    - exists:
+        - '**/*.go'
+  variables:
+    CONFIG_FILE_LINK: "https://gitlab.com/gitlab-ci-utils/config-files/-/raw/main/Linters/.golangci.yml"
+  before_script:
+    - apk add jq
+    # Use default .golangci.yml file if it does not exist
+    - |
+      if [ ! -f .golangci.yml ]; then
+        echo "Using config file: $CONFIG_FILE_LINK"
+        wget -q $CONFIG_FILE_LINK
+      fi
+  script:
+    - 'echo "Additional CLI args: $LINT_GO_CLI_ARGS"'
+    # Write the code coverage report to gl-code-quality-report.json
+    - golangci-lint run --output.code-climate.path=gl-code-quality-report.json $LINT_GO_CLI_ARGS
+  after_script:
+    # Print linting issues to stdout in the format: path/to/file:line description
+    - cat gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - gl-code-quality-report.json
+  allow_failure: true
+
+# Unit tests with coverage
+go_test:
+  image: "golang:${GO_VERSION}-alpine"
+  stage: go-test
+  needs:
+    - job: go_mod_download
+      optional: true
+  before_script:
+    # Get list of packages, replace newline with comma, and remove training comma.
+    - export GO_COVER_PACKAGES=$(go list ./... | tr '\n' ',' | sed 's/,$//')
+    - go get github.com/t-yuki/gocover-cobertura@latest
+  script:
+    - go test -v -coverpkg="$GO_COVER_PACKAGES" -coverprofile=coverage.out -covermode=count ./... | tee tests.txt
+    - go tool cover -func coverage.out
+  after_script:
+    # Generate Cobertura coverage report for GitLab
+    - $GOPATH/bin/gocover-cobertura -by-files < coverage.out > coverage.xml
+    # Generate HTML coverage report
+    - go tool cover -html coverage.out -o coverage.html
+    # Generate JUnit report for GitLab
+    - go-junit-report < tests.txt > junit.xml
+  coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
+  artifacts:
+    expose_as: 'Go Test Coverage Report'
+    paths:
+      - coverage.html
+      - coverage.out
+      - tests.txt
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      junit: junit.xml
+  rules:
+    - exists:
+        - "*.go"
+
+# Race condition tests
+go_test_race:
+  image: "golang:${GO_VERSION}"
+  stage: go-test
+  needs:
+    - job: go_mod_download
+      optional: true
+  variables:
+    # cgo is required for -race.
+    CGO_ENABLED: "1"
+  script:
+    - go test ./... -race
+  rules:
+    - exists:
+        - "*.go"
+
+# Check if go mod tidy produces any changes
+go_mod_tidy:
+  image: "golang:${GO_VERSION}-alpine"
+  stage: go-test
+  needs:
+    - job: go_mod_download
+      optional: true
+  rules:
+    - exists:
+        - '**/go.sum'
+  script:
+    - |
+      # Check if go mod tidy produces any changes
+      if [ ! -f "go.mod" ]; then echo "go.mod file not found" && exit 2; fi
+      cp go.mod go.mod.before
+      cp go.sum go.sum.before
+      go mod tidy
+      diff go.mod.before go.mod && diff go.sum.before go.sum
+
+# Job to check for available updates for any direct module dependencies.
+go_mod_updates:
+  image: "golang:${GO_VERSION}-alpine"
+  stage: go-test
+  needs:
+    - job: go_mod_download
+      optional: true
+  rules:
+    - exists:
+        - '**/go.sum'
+  allow_failure: true
+  before_script:
+    - apk add jq
+  script:
+    # Waiting on https://github.com/golang/go/issues/40364 to allow listing
+    # only direct dependencies so don't have to check JSON.
+    - |
+      # Check for available updates to any direct module dependencies
+      UPDATES=$(go list -u -m -json all | \
+        jq -c -r 'select(.Update != null and .Indirect == null) | "\(.Path) \(.Version) [\(.Update.Version)]"')
+      printf "$UPDATES\n"
+      if [ $(echo $UPDATES | wc -w) != "0" ]; then exit 1; fi
+
+# Build for current OS/arch
+go_build:
+  image: "golang:${GO_VERSION}-alpine"
+  stage: build-app
+  script:
+    - export CGO_ENABLED=0
+    - go build ${GO_BUILD_ARGS} -o ./${GO_BIN_DIR}/${GO_BUILD_NAME} ${GO_MAIN_DIR}
+  artifacts:
+    paths:
+      - ./${GO_BIN_DIR}/${GO_BUILD_NAME}*
+
+# Build container
+build-container:
+  image:
+    name: moby/buildkit:rootless
+    entrypoint: [""]
+  stage: build-container
+  dependencies:
+    - go_build
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+    CACHE_IMAGE: $CI_REGISTRY_IMAGE:cache
+  before_script:
+    - mkdir -p ~/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json
+  script:
+    - |
+      mkdir -vp app
+      cp -v ./${GO_BIN_DIR}/${GO_BUILD_NAME} ./app/app
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --local context=. \
+        --local dockerfile=. \
+        --export-cache type=registry,ref=$CACHE_IMAGE \
+        --import-cache type=registry,ref=$CACHE_IMAGE \
+        --output type=image,$CI_REGISTRY_IMAGE:latest,push=true
+#        --output type=image,\"name=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA,$CI_REGISTRY_IMAGE:latest\",push=true
