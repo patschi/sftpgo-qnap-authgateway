@@ -65,16 +65,9 @@ go_lint:
     CONFIG_FILE_LINK: "https://gitlab.com/gitlab-ci-utils/config-files/-/raw/main/Linters/.golangci.yml"
   before_script:
     - apk add jq
-    # Use default .golangci.yml file if it does not exist
-    - |
-      if [ ! -f .golangci.yml ]; then
-        echo "Using config file: $CONFIG_FILE_LINK"
-        wget -q $CONFIG_FILE_LINK
-      fi
   script:
-    - 'echo "Additional CLI args: $LINT_GO_CLI_ARGS"'
     # Write the code coverage report to gl-code-quality-report.json
-    - golangci-lint run --output.code-climate.path=gl-code-quality-report.json $LINT_GO_CLI_ARGS
+    - golangci-lint run --config .ci/golangci.yml --output.code-climate.path=gl-code-quality-report.json
   after_script:
     # Print linting issues to stdout in the format: path/to/file:line description
     - cat gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
