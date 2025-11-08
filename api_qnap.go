@@ -180,7 +180,7 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 		return nil, err
 	}
 	defer closeIOBody(&resp.Body)
-	
+
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithField("user", user).WithError(readErr).Error("getShares: failed to read response body")

@@ -188,7 +188,7 @@ go_build:
 build-container:
   image:
     name: moby/buildkit:rootless
-    entrypoint: [""]
+    entrypoint: [ "" ]
   stage: build-container
   dependencies:
     - go_build

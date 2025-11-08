@@ -18,11 +18,11 @@ folders. Fast, stateless, and logs every request with a request ID.
 - Configure the environment variables and start the service.
 - Point SFTPGo external auth to the service endpoint:
     - `external_auth_hook=https://sftpgo-qnap-authgw/auth`
-    - `external_auth_scope=5` (only password and keyboard-interactive; any other are unsupported)
+    - `external_auth_scope=5` (only password and keyboard-interactive; any other is unsupported)
 - Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent this
-  auth gateway to be blocked, instead of the user)
+  auth gateway from being blocked, instead of the user)
 - If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable REST
-  API on SFTPGo and provide below environment variable.
+  API on SFTPGo and provide the below environment variable.
 
 ## Configuration
 
