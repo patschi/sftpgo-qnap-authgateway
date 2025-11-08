@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -234,7 +235,7 @@ func normalizeURL(raw string) string {
 
 // parseBoolEnv reads an environment variable as a boolean with a default fallback.
 func parseBoolEnv(key string, defaultValue bool) bool {
-	val := strings.ToLower(strings.TrimSpace(getEnv(key, fmt.Sprintf("%v", defaultValue))))
+	val := strings.ToLower(strings.TrimSpace(getEnv(key, strconv.FormatBool(defaultValue))))
 	switch val {
 	case "true", "1", "yes", "y", "on":
 		return true
