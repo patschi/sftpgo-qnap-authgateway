@@ -27,8 +27,8 @@ const (
 
 	// AuthPath server listen address and endpoint
 	AuthPath = "/auth"
-	// HttpTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
-	HttpTimeout = 7 * time.Second
+	// HTTPTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
+	HTTPTimeout = 7 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
 	MaxBodyBytes = 5 * 1024 // 5 KiB
 
@@ -44,27 +44,27 @@ var (
 	AuthGwAddr string
 	// AuthGwPort defines to which port it's binding it on'
 	AuthGwPort string
-	// AuthGwHttps defines if it's running in HTTPS mode or not'
-	AuthGwHttps bool
+	// AuthGwHTTPS defines if it's running in HTTPS mode or not'
+	AuthGwHTTPS bool
 
-	// QnapUrl defines the full URL to use for QNAP API calls
+	// QnapURL defines the full URL to use for QNAP API calls
 	// (example: https://10.0.0.100)
-	QnapUrl string
+	QnapURL string
 	// QnapCheckCert defines if the certificate of QNAP should be checked when accessing QNAP API
 	QnapCheckCert bool
 	// QnapSharePath defines a path for QNAP shares where the share is located
 	// (example: /share/{path}/; as in /share/Public)
 	QnapSharePath string
 
-	// SftpgoApiUrl is the URL of the sftpgo API
+	// SftpgoAPIURL is the URL of the sftpgo API
 	// (only https://sftpgo.example.com; do NOT include the /api/ prefix)
-	SftpgoApiUrl string
+	SftpgoAPIURL string
 	// SftpgoCheckCert defines if the certificate of sftpgo should be checked when accessing sftpgo REST API
 	SftpgoCheckCert bool
-	// SftpgoApiUser is the username to use for authentication with the sftpgo API
-	SftpgoApiUser string
-	// SftpgoApiPass is the password to use for authentication with the sftpgo API
-	SftpgoApiPass string
+	// SftpgoAPIUser is the username to use for authentication with the sftpgo API
+	SftpgoAPIUser string
+	// SftpgoAPIPass is the password to use for authentication with the sftpgo API
+	SftpgoAPIPass string
 	// SftpgoHomeDir is the home directory to use for the sftpgo user
 	// (default: /var/tmp; "{username}" will be replaced with the username)
 	SftpgoHomeDir string
@@ -73,7 +73,7 @@ var (
 	// in sftpgo based on the shares accessible for specific user during time of login.
 	SftpgoVirtualFolderSync bool
 
-	SharePermsDeny      = []string{}
+	SharePermsDeny      []string
 	SharePermsListOnly  = []string{"list"}
 	SharePermsReadOnly  = []string{"list", "download"}
 	SharePermsReadWrite = []string{"*"}
@@ -83,7 +83,7 @@ var (
 // Main
 // -----------------------------
 
-// main is the main function
+// main is the main function.
 func main() {
 	// Setup logger
 	setupLogger()
@@ -97,7 +97,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
-		Handler: HttpServerMiddleware(mux),
+		Handler: HTTPServerMiddleware(mux),
 
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -106,12 +106,12 @@ func main() {
 
 	// Check if we are running in HTTPS mode
 	AuthGwScheme := "http"
-	if AuthGwHttps {
+	if AuthGwHTTPS {
 		AuthGwScheme = "https"
 		log.Fatal("not yet implemented")
 	}
 
-	if !AuthGwHttps {
+	if !AuthGwHTTPS {
 		log.Warn("running in HTTP mode. not secure. not recommended for production!")
 	}
 
@@ -119,8 +119,8 @@ func main() {
 	go func() {
 		log.WithFields(log.Fields{
 			"authgw": fmt.Sprintf("%s://%s:%s%s", AuthGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
-			"qnap":   QnapUrl,
-			"sftpgo": SftpgoApiUrl,
+			"qnap":   QnapURL,
+			"sftpgo": SftpgoAPIURL,
 		}).Info("starting QNAP auth gateway")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.WithError(err).Fatal("error starting HTTP server")
@@ -143,10 +143,10 @@ func main() {
 	}
 }
 
-// loadSettings loads all settings from environment variables
+// loadSettings loads all settings from environment variables.
 func loadSettings() {
 	// --- QNAP API Configuration ---
-	QnapUrl = normalizeURL(getEnv("QNAP_URL", "https://host.docker.internal"))
+	QnapURL = normalizeURL(getEnv("QNAP_URL", "https://host.docker.internal"))
 	QnapSharePath = strings.TrimSpace(strings.TrimSuffix(getEnv("QNAP_SHARE_PATH", "/share/{name}"), "/"))
 
 	QnapCheckCert = parseBoolEnv("QNAP_CHECK_CERT", true)
@@ -156,14 +156,14 @@ func loadSettings() {
 	}
 
 	// --- SFTPGo API Configuration ---
-	SftpgoApiUrl = normalizeURL(getEnv("SFTPGO_API_URL", "http://host.docker.internal:8080"))
-	SftpgoApiUser = getEnv("SFTPGO_API_USER", "sa-qnap-authgw")
-	SftpgoApiPass = getEnv("SFTPGO_API_PASS", "")
+	SftpgoAPIURL = normalizeURL(getEnv("SFTPGO_API_URL", "http://host.docker.internal:8080"))
+	SftpgoAPIUser = getEnv("SFTPGO_API_USER", "sa-qnap-authgw")
+	SftpgoAPIPass = getEnv("SFTPGO_API_PASS", "")
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
 	log.WithField("state", SftpgoVirtualFolderSync).Info("SFTPGO virtual folder sync state")
 
-	if SftpgoVirtualFolderSync && SftpgoApiPass == "" {
+	if SftpgoVirtualFolderSync && SftpgoAPIPass == "" {
 		log.Fatal("SFTPGO_API_PASS is not set, but SFTPGO_FOLDER_SYNC is enabled!")
 	}
 
@@ -176,12 +176,12 @@ func loadSettings() {
 	SftpgoHomeDir = getEnv("SFTPGO_HOME_DIR", "/var/tmp")
 
 	// --- Auth Gateway Configuration ---
-	AuthGwHttps = parseBoolEnv("AUTHGW_HTTPS", false)
+	AuthGwHTTPS = parseBoolEnv("AUTHGW_HTTPS", false)
 	AuthGwAddr = getEnv("AUTHGW_ADDR", "0.0.0.0")
 	AuthGwPort = getEnv("AUTHGW_PORT", "9999")
 }
 
-// setupLogger is initializing the logger and setting up the log level
+// setupLogger is initializing the logger and setting up the log level.
 func setupLogger() {
 	// Force UTC timezone
 	time.Local = time.UTC // ensure default time.Local is UTC for timestamp generation
@@ -216,7 +216,7 @@ func setupLogger() {
 
 // --- Helper Functions ---
 
-// getEnv retrieves environment variable with the ability of fallback value
+// getEnv retrieves environment variable with the ability of fallback value.
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value

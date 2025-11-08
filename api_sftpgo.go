@@ -16,14 +16,14 @@ import (
 // Types for incoming request and sftpgo response
 // --------------------------
 
-// sftpgoVirtualFolder links a virtual folder to a single folder in sftpgo, including its permissions for specific user.
+// sftpgoVirtualFolder links a virtual folder to a single folder in sftpgo, including permissions for a specific user.
 type sftpgoVirtualFolder struct {
 	Name        string   `json:"name"`
 	VirtualPath string   `json:"virtual_path"`
 	Permission  []string `json:"-"`
 }
 
-// sftpgoBackendFolder is a single virtual folder in sftpgo
+// sftpgoBackendFolder is a single virtual folder in sftpgo.
 type sftpgoBackendFolder struct {
 	Name        string                  `json:"name"`
 	Description string                  `json:"description,omitempty"`
@@ -31,19 +31,19 @@ type sftpgoBackendFolder struct {
 	Filesystem  *sftpgoFolderFilesystem `json:"filesystem"`
 }
 
-// sftpgoFolderFilesystem is the filesystem provider for a virtual folder
+// sftpgoFolderFilesystem is the filesystem provider for a virtual folder.
 // (currently only local filesystem is supported; its value is always 0)
 type sftpgoFolderFilesystem struct {
 	Provider int `json:"provider"`
 }
 
-// sftpgoResponse is the final response to sftpgo after authentication
+// sftpgoResponse is the final response to sftpgo after authentication.
 type sftpgoResponse struct {
-	Id             int32                 `json:"id,omitempty"`
+	ID             int32                 `json:"id,omitempty"`
 	Status         int                   `json:"status"`                    // 0 = disabled, 1 = enabled
 	Username       string                `json:"username"`                  // empty = disallow login
-	Uid            int32                 `json:"uid,omitempty"`             // 0 = no change
-	Gid            int32                 `json:"gid,omitempty"`             // 0 = no change
+	UID            int32                 `json:"uid,omitempty"`             // 0 = no change
+	GID            int32                 `json:"gid,omitempty"`             // 0 = no change
 	ExpirationDate int64                 `json:"expiration_date,omitempty"` // 0 = no expiration; unix timestamp in ms
 	HomeDir        string                `json:"home_dir,omitempty"`
 	VirtualFolders []sftpgoVirtualFolder `json:"virtual_folders,omitempty"` // user-facing folders seen after login
@@ -54,7 +54,7 @@ type sftpgoResponse struct {
 
 // Main functions
 
-// sftpgoSyncFolders is the main function to sync virtual folders with sftpgo REST API
+// sftpgoSyncFolders is the main function to sync virtual folders with sftpgo REST API.
 // It will authenticate towards sftpgo REST API, create/update/delete folders as necessary,
 // and logout. It returns a list of folders that could not be processed/synced.
 func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]string, error) {
@@ -69,7 +69,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 	}
 	client := &http.Client{
 		Jar:     jar,
-		Timeout: HttpTimeout,
+		Timeout: HTTPTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: !SftpgoCheckCert,
@@ -152,17 +152,17 @@ func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desi
 // sftpgoGetLoginToken authenticates towards sftpgo REST API and retrieves a login token.
 // It returns the token, HTTP status code, and error if any.
 func sftpgoGetLoginToken(log *log.Entry, client *http.Client) (string, int, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/token", SftpgoApiUrl), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
 	if err != nil {
-		return "", 400, err
+		return "", http.StatusUnprocessableEntity, err
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.SetBasicAuth(SftpgoApiUser, SftpgoApiPass)
+	req.SetBasicAuth(SftpgoAPIUser, SftpgoAPIPass)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", 400, err
+		return "", http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -192,11 +192,11 @@ func sftpgoGetLoginToken(log *log.Entry, client *http.Client) (string, int, erro
 }
 
 // sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error if any.
-// This will invalidate the token, so it can not longer be used.
+// This will invalidate the token, so it cannot longer be used.
 func sftpgoLogout(log *log.Entry, client *http.Client, token string) (int, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/logout", SftpgoApiUrl), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
 	if err != nil {
-		return 400, err
+		return http.StatusUnprocessableEntity, err
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -204,7 +204,7 @@ func sftpgoLogout(log *log.Entry, client *http.Client, token string) (int, error
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 400, err
+		return http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -230,7 +230,7 @@ func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folde
 		return err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v2/folders", SftpgoApiUrl), bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL), bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -261,12 +261,12 @@ func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folde
 
 // sftpgoGetFolder retrieves a specific virtual folder by name from sftpgo REST API.
 // It returns the folder, HTTP status code, and error if any. The folder is returned as a struct.
-// HTTP Error 404 means folder does not exist.
+// HTTP Error 404 means the folder does not exist.
 func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
-	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoApiUrl, name)
+	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, name)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return sftpgoBackendFolder{}, 400, err
+		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -274,7 +274,7 @@ func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (s
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return sftpgoBackendFolder{}, 400, err
+		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -294,12 +294,12 @@ func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (s
 	var folder sftpgoBackendFolder
 	if err := json.Unmarshal(body, &folder); err != nil {
 		log.WithError(err).Error("failed to unmarshal folder details")
-		return sftpgoBackendFolder{}, 400, err
+		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
 	return folder, 200, nil
 }
 
-// sftpgoUpdateFolder updates a virtual folder in sftpgo REST API with struct provided. It returns an error if any.
+// sftpgoUpdateFolder updates a virtual folder in sftpgo REST API with the struct provided. It returns an error, if any.
 func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
@@ -307,7 +307,7 @@ func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folde
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoApiUrl, folder.Name)
+	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, folder.Name)
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err

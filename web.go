@@ -26,7 +26,7 @@ import (
 // Types for auth gateway
 // -----------------------------
 
-// authRequest is the incoming request from sftpgo (parameters which are used for this gateway)
+// authRequest is the incoming request from sftpgo (parameters which are used for this gateway).
 type authRequest struct {
 	Username            string      `json:"username"`
 	Password            SecureBytes `json:"password"`
@@ -34,11 +34,11 @@ type authRequest struct {
 	IP                  string      `json:"ip"`
 	PublicKey           string      `json:"public_key"`
 	KeyboardInteractive string      `json:"keyboard_interactive"`
-	TlsCert             string      `json:"tls_cert"`
+	TLSCert             string      `json:"tls_cert"`
 }
 
-// HttpServerMiddleware takes care of transparent logging and request-id
-func HttpServerMiddleware(next http.Handler) http.Handler {
+// HTTPServerMiddleware takes care of transparent logging and request-id.
+func HTTPServerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now().UTC()
 		ip := clientIPFromRequest(r)
@@ -82,8 +82,8 @@ func clientIPFromRequest(r *http.Request) string {
 			return strings.TrimSpace(parts[0])
 		}
 	}
-	if realIp := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIp != "" {
-		return realIp
+	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
+		return realIP
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -160,7 +160,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check for supported authentication methods
-	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TlsCert != "" {
+	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TLSCert != "" {
 		userLog.Warn("unsupported authentication method")
 		writeDeny(w, http.StatusBadRequest, "unsupported_method", "unsupported authentication method")
 		return
@@ -191,7 +191,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	client := &http.Client{
 		Jar:     jar,
-		Timeout: HttpTimeout,
+		Timeout: HTTPTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: !QnapCheckCert,
@@ -201,12 +201,12 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create context with timeout derived from request context
-	ctx, cancel := context.WithTimeout(r.Context(), HttpTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), HTTPTimeout)
 	defer cancel()
 
 	// qnapLogin uses ctx to abort the request if timeout
 	userLog.Debug("initiating qnap login")
-	sid, err := qnapLogin(ctx, client, QnapUrl, req)
+	sid, err := qnapLogin(ctx, client, QnapURL, req)
 	req.Password.Wipe() // Wipe password from memory
 
 	if err != nil {
@@ -225,7 +225,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	userLog.Info("qnap login workflow reported success")
 
 	// Fetch shares
-	shares, err := qnapGetShares(ctx, client, QnapUrl, sid, req.Username)
+	shares, err := qnapGetShares(ctx, client, QnapURL, sid, req.Username)
 	if err != nil {
 		userLog.WithError(err).Errorf("failed to fetch shares for user")
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
@@ -240,7 +240,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Logout user from QNAP
 	userLog.Debug("logging user out of QNAP API...")
-	if err := qnapLogout(ctx, client, QnapUrl, sid); err != nil {
+	if err := qnapLogout(ctx, client, QnapURL, sid); err != nil {
 		userLog.WithError(err).Errorf("failed to logout of qnap. proceeding...")
 	} else {
 		userLog.Info("destroyed login session for user in QNAP API")

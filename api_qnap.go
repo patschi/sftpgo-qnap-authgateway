@@ -19,7 +19,7 @@ import (
 // Types for QNAP responses
 // -----------------------------
 
-// qnapLoginResp is the response from QNAP API for login requests
+// qnapLoginResp is the response from QNAP API for login requests.
 type qnapLoginResp struct {
 	XMLName    xml.Name `xml:"QDocRoot"`
 	AuthPassed string   `xml:"authPassed"`
@@ -27,7 +27,7 @@ type qnapLoginResp struct {
 	ErrorValue string   `xml:"errorValue"`
 }
 
-// qnapShareNode is a single shared folder
+// qnapShareNode is a single shared folder.
 type qnapShareNode struct {
 	Text         string `json:"text"`
 	ID           string `json:"id"`
@@ -155,7 +155,7 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("logout failed HTTP %d: unable to read response body: %v", resp.StatusCode, err)
+			return fmt.Errorf("logout failed HTTP %d: unable to read response body: %w", resp.StatusCode, err)
 		}
 		return fmt.Errorf("logout failed HTTP %d: %s", resp.StatusCode, string(body))
 	}
@@ -169,7 +169,7 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 // Returns a slice of qnapShareNode containing share details or an error in case of failure.
 func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid string, user string) ([]qnapShareNode, error) {
 
-	sharesUrl := fmt.Sprintf("%s/cgi-bin/filemanager/utilRequest.cgi", baseURL)
+	api := fmt.Sprintf("%s/cgi-bin/filemanager/utilRequest.cgi", baseURL)
 	params := url.Values{}
 	params.Set("func", "get_tree")
 	params.Set("node", "share_root")
@@ -180,7 +180,7 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 
 	log.WithField("user", user).Debugf("calling qnap get_tree endpoint")
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sharesUrl, strings.NewReader(params.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, api, strings.NewReader(params.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 	// parse as array
 	var arr []qnapShareNode
 	if err := json.Unmarshal(body, &arr); err != nil {
-		return nil, fmt.Errorf("unable to parse get_tree response: %s", err)
+		return nil, fmt.Errorf("unable to parse get_tree response: %w", err)
 	}
 	log.WithFields(log.Fields{
 		"user":     user,
