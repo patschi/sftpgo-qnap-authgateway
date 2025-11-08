@@ -215,5 +215,5 @@ build-container:
         --local dockerfile=. \
         --export-cache type=registry,ref=$CACHE_IMAGE \
         --import-cache type=registry,ref=$CACHE_IMAGE \
-        --output type=image,$CI_REGISTRY_IMAGE:latest,push=true
+        --output type=image,name=$CI_REGISTRY_IMAGE:latest,push=true
 #        --output type=image,\"name=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA,$CI_REGISTRY_IMAGE:latest\",push=true
