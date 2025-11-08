@@ -28,10 +28,17 @@ const (
 
 	// AuthPath server listen address and endpoint
 	AuthPath = "/auth"
-	// HTTPTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
-	HTTPTimeout = 7 * time.Second
 	// MaxBodyBytes is limiting body size for JSON parsing
 	MaxBodyBytes = 5 * 1024 // 5 KiB
+
+	// HTTPTimeout defines HTTP client timeout for every HTTP request to QNAP/sftpgo API
+	HTTPTimeout = 7 * time.Second
+	// HTTPServerReadTimeout defines the HTTP server read timeout
+	HTTPServerReadTimeout = 15 * time.Second
+	// HTTPServerWriteTimeout defines the HTTP server write timeout
+	HTTPServerWriteTimeout = 15 * time.Second
+	// HTTPServerIdleTimeout defines the HTTP server idle timeout
+	HTTPServerIdleTimeout = 60 * time.Second
 
 	// QnapSharePrefix is the prefix that will be added for every share name
 	// This will be used as a human-readable identifier for the share in sftpgo
@@ -100,18 +107,17 @@ func main() {
 	mux.HandleFunc(AuthPath, webAuthHandler)
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
-		Handler: HTTPServerMiddleware(mux),
-
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:         fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
+		Handler:      HTTPServerMiddleware(mux),
+		ReadTimeout:  HTTPServerReadTimeout,
+		WriteTimeout: HTTPServerWriteTimeout,
+		IdleTimeout:  HTTPServerIdleTimeout,
 	}
 
 	// Check if we are running in HTTPS mode
-	AuthGwScheme := "http"
+	authGwScheme := "http"
 	if AuthGwHTTPS {
-		AuthGwScheme = "https"
+		authGwScheme = "https"
 		log.Fatal("not yet implemented")
 	}
 
@@ -122,7 +128,7 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		log.WithFields(log.Fields{
-			"authgw": fmt.Sprintf("%s://%s:%s%s", AuthGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
+			"authgw": fmt.Sprintf("%s://%s:%s%s", authGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
 			"qnap":   QnapURL,
 			"sftpgo": SftpgoAPIURL,
 		}).Info("starting QNAP auth gateway")
@@ -140,6 +146,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	if err := server.Shutdown(ctx); err != nil {
 		log.WithError(err).Errorf("http server shutdown error")
 	} else {

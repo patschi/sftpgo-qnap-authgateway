@@ -181,13 +181,48 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		"ip":       req.IP,
 	}).Info("auth request received")
 
+	// Process authentication request
+	resp, err := performAuthentication(userLog, r, w, req)
+	if err != nil {
+		userLog.WithError(err).Error("failed to process authentication request")
+		return
+	}
+
+	// Encode response as JSON and return to the client
+	data, err := json.Marshal(resp)
+	if err != nil {
+		userLog.WithError(err).Error("failed to encode success response")
+		writeDeny(w, http.StatusInternalServerError, "json_encode_failed",
+			"failed to encode success response")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+
+	userLog.Info("reported authentication success to sftpgo")
+	userLog.WithField("response", string(data)).Trace("debug authentication json response")
+}
+
+// performAuthentication performs the authentication workflow.
+// It returns a sftpgoResponse and an error.
+//
+// The workflow is as follows:
+// - create a per-request cookie jar and client (no shared cookies)
+// - create context with timeout derived from request context
+// - qnapLogin uses ctx to abort the request if timeout
+// - fetch shares from QNAP API
+// - build virtual folders and permissions
+// - sync folders to sftpgo
+func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseWriter, req authRequest) (sftpgoResponse, error) {
 	// Create a per-request cookie jar and client (no shared cookies)
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		userLog.WithError(err).Error("failed to create cookie jar")
 		writeDeny(w, http.StatusInternalServerError, "internal_error",
 			"failed to initialize authentication")
-		return
+		return sftpgoResponse{}, err
 	}
 	client := &http.Client{
 		Jar:     jar,
@@ -215,12 +250,12 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errAuthFailed) {
 			userLog.Warn("qnap authentication failed")
 			writeDeny(w, http.StatusUnauthorized, "auth_failed", "authentication failed")
-			return
+			return sftpgoResponse{}, err
 		}
 		// other errors (timeout, network) -> ERROR
 		userLog.WithError(err).Errorf("qnap login error")
 		writeDeny(w, http.StatusInternalServerError, "qnap_error", "qnap authentication error")
-		return
+		return sftpgoResponse{}, err
 	}
 	userLog.Info("qnap login workflow reported success")
 
@@ -229,7 +264,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		userLog.WithError(err).Errorf("failed to fetch shares for user")
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
-		return
+		return sftpgoResponse{}, err
 	}
 
 	// Shares received. Proceeding.
@@ -250,33 +285,15 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	folders, virtualFolders := buildVirtualFolders(userLog, shares)
 
 	// Initiate sftpgo virtual folder sync
-	log.WithField("folders", folders).Trace("all folders")
+	userLog.WithField("folders", folders).Trace("all folders")
 	failedFolders, err := sftpgoSyncFolders(userLog, folders)
 	if err != nil {
 		userLog.WithError(err).Error("failed to sync folders, denying login")
 		writeDeny(w, http.StatusInternalServerError, "sync_folders_failed",
 			"failed to sync folders")
-		return
+		return sftpgoResponse{}, err
 	}
-	// Remove any failed folders from virtualFolders
-	if len(failedFolders) > 0 {
-		userLog.WithField("folders", failedFolders).Warn("failed to sync folders, denying access to affected")
-
-		// Create a set of failed folder names for O(1) lookup
-		failedSet := make(map[string]struct{}, len(failedFolders))
-		for _, name := range failedFolders {
-			failedSet[name] = struct{}{}
-		}
-
-		// Filter out failed folders
-		filteredFolders := virtualFolders[:0]
-		for _, vf := range virtualFolders {
-			if _, isFailed := failedSet[vf.Name]; !isFailed {
-				filteredFolders = append(filteredFolders, vf)
-			}
-		}
-		virtualFolders = filteredFolders
-	}
+	filterInvalidFolders(&virtualFolders, failedFolders)
 	userLog.Info("sftpgo virtual folders synced")
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
@@ -288,7 +305,6 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Build permissions map
 	perms := make(map[string][]string, len(virtualFolders)+1)
-
 	// Default permission to the root folder by default
 	perms["/"] = SharePermsListOnly
 
@@ -306,21 +322,29 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		Permissions:    perms,
 	}
 
-	// Encode response as JSON and return to the client
-	data, err := json.Marshal(resp)
-	if err != nil {
-		userLog.WithError(err).Error("failed to encode success response")
-		writeDeny(w, http.StatusInternalServerError, "json_encode_failed",
-			"failed to encode success response")
-		return
+	return resp, nil
+}
+
+// filterInvalidFolders filters out any failed folders from virtualFolders.
+// It modifies virtualFolders in-place.
+func filterInvalidFolders(virtualFolders *[]sftpgoVirtualFolder, failedFolders []string) {
+	// Remove any failed folders from virtualFolders
+	if len(failedFolders) > 0 {
+		// Create a set of failed folder names for O(1) lookup
+		failedSet := make(map[string]struct{}, len(failedFolders))
+		for _, name := range failedFolders {
+			failedSet[name] = struct{}{}
+		}
+
+		// Filter out failed folders
+		filteredFolders := (*virtualFolders)[:0]
+		for _, vf := range *virtualFolders {
+			if _, isFailed := failedSet[vf.Name]; !isFailed {
+				filteredFolders = append(filteredFolders, vf)
+			}
+		}
+		virtualFolders = &filteredFolders
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
-
-	userLog.Info("reported authentication success to sftpgo")
-	userLog.WithField("response", string(data)).Trace("debug authentication json response")
 }
 
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.

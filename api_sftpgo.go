@@ -89,6 +89,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		log.WithField("http_code", code).WithError(err).Error("failed to get sftpgo token")
 		return []string{}, err
 	}
+	log.Info("sftpgo token obtained, authentication successful")
 
 	// We go through each desiredFolder and check if it exists in sftpgo.
 	// if it does not, we create it.
@@ -98,7 +99,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		log.WithField("folder", name).Debug("checking folder")
 		apiErr := sftpgoProcessFolder(ctx, log, client, token, desiredFolder)
 		if apiErr != nil {
-			log.WithField("folder", name).WithError(apiErr).Error("failed to create/update folder")
+			log.WithField("folder", name).WithError(apiErr).Error("failed to create/update folder, skipping")
 			failedFolders = append(failedFolders, name)
 		}
 	}
@@ -260,7 +261,7 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 		return fmt.Errorf("create folder failed: %s", string(body))
 	}
 
-	log.WithField("name", folder.Name).Info("Folder created successfully")
+	log.WithField("name", folder.Name).Info("folder created successfully")
 	return nil
 }
 
