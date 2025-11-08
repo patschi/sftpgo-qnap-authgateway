@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -78,8 +79,12 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		},
 	}
 
+	// Create context with timeout derived from request context
+	ctx, cancel := context.WithTimeout(context.Background(), HTTPTimeout)
+	defer cancel()
+
 	// Authenticate and obtain token
-	token, code, err := sftpgoGetLoginToken(log, client)
+	token, code, err := sftpgoGetLoginToken(ctx, log, client)
 	if err != nil {
 		log.WithField("http_code", code).WithError(err).Error("failed to get sftpgo token")
 		return []string{}, err
@@ -91,7 +96,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 	for _, desiredFolder := range desiredFolders {
 		name := desiredFolder.Name
 		log.WithField("folder", name).Debug("checking folder")
-		err := sftpgoProcessFolder(log, client, token, desiredFolder)
+		err := sftpgoProcessFolder(ctx, log, client, token, desiredFolder)
 		if err != nil {
 			log.WithField("folder", name).WithError(err).Error("failed to create/update folder")
 			failedFolders = append(failedFolders, name)
@@ -99,7 +104,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 	}
 
 	// Logout
-	if code, err := sftpgoLogout(log, client, token); err != nil {
+	if code, err := sftpgoLogout(ctx, log, client, token); err != nil {
 		log.WithField("http_code", code).WithError(err).Error("failed to logout of sftpgo, proceeding...")
 	}
 
@@ -108,11 +113,11 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 
 // sftpgoProcessFolder is processing and taking care of single folders. It will create/update as necessary.
 // It returns an error if something went wrong.
-func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desiredFolder sftpgoBackendFolder) error {
+func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, desiredFolder sftpgoBackendFolder) error {
 	name := desiredFolder.Name
 	log.WithField("folder", name).Debug("processing folder")
 
-	folder, code, err := sftpgoGetFolder(log, client, token, name)
+	folder, code, err := sftpgoGetFolder(ctx, log, client, token, name)
 	// We consider 200 and 404 to be fine (200 = folder exists, 404 = folder does not exist)
 	if code == 200 || code == 404 {
 		// soft-fail. don't error out.
@@ -127,7 +132,7 @@ func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desi
 	// Create the folder if it does not exist
 	if code == 404 {
 		// Folder does not exist, create it
-		if err := sftpgoCreateFolder(log, client, token, desiredFolder); err != nil {
+		if err := sftpgoCreateFolder(ctx, log, client, token, desiredFolder); err != nil {
 			log.WithField("folder", name).WithField("http_code", code).Info("failed to create folder")
 			return err
 		}
@@ -139,7 +144,7 @@ func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desi
 		if !folderStructsEqual(log, folder, desiredFolder) {
 			log.WithField("folder", name).Info("folder differs from desired state, updating...")
 			// Differences found, delete and recreate folder
-			if err := sftpgoUpdateFolder(log, client, token, desiredFolder); err != nil {
+			if err := sftpgoUpdateFolder(ctx, log, client, token, desiredFolder); err != nil {
 				log.WithField("folder", name).WithError(err).Error("failed to update folder")
 				return err
 			}
@@ -151,8 +156,8 @@ func sftpgoProcessFolder(log *log.Entry, client *http.Client, token string, desi
 
 // sftpgoGetLoginToken authenticates towards sftpgo REST API and retrieves a login token.
 // It returns the token, HTTP status code, and error if any.
-func sftpgoGetLoginToken(log *log.Entry, client *http.Client) (string, int, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
+func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Client) (string, int, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
 	if err != nil {
 		return "", http.StatusUnprocessableEntity, err
 	}
@@ -193,8 +198,8 @@ func sftpgoGetLoginToken(log *log.Entry, client *http.Client) (string, int, erro
 
 // sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error if any.
 // This will invalidate the token, so it cannot longer be used.
-func sftpgoLogout(log *log.Entry, client *http.Client, token string) (int, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
+func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, token string) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
 	if err != nil {
 		return http.StatusUnprocessableEntity, err
 	}
@@ -223,14 +228,14 @@ func sftpgoLogout(log *log.Entry, client *http.Client, token string) (int, error
 }
 
 // sftpgoCreateFolder creates a virtual folder in sftpgo REST API. It returns an error if any.
-func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
+func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("sftpgo create folder: failed to marshal folder payload")
 		return err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL), bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL), bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -262,9 +267,9 @@ func sftpgoCreateFolder(log *log.Entry, client *http.Client, token string, folde
 // sftpgoGetFolder retrieves a specific virtual folder by name from sftpgo REST API.
 // It returns the folder, HTTP status code, and error if any. The folder is returned as a struct.
 // HTTP Error 404 means the folder does not exist.
-func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
+func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, name)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
@@ -300,7 +305,7 @@ func sftpgoGetFolder(log *log.Entry, client *http.Client, token, name string) (s
 }
 
 // sftpgoUpdateFolder updates a virtual folder in sftpgo REST API with the struct provided. It returns an error, if any.
-func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
+func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("failed to marshal folder for update")
@@ -308,7 +313,7 @@ func sftpgoUpdateFolder(log *log.Entry, client *http.Client, token string, folde
 	}
 
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, folder.Name)
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
