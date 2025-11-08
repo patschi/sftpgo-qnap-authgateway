@@ -83,41 +83,11 @@ var (
 // Main
 // -----------------------------
 
-// init initializes the application
-func init() {
-	// Force UTC timezone
-	time.Local = time.UTC // ensure default time.Local is UTC for timestamp generation
-
-	// Setup logging
-	log.SetOutput(os.Stdout)
-	log.SetReportCaller(true)
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02T15:04:05.000",
-		DisableColors:   true,
-		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
-			return f.Function, ""
-		},
-	})
-	log.SetLevel(log.DebugLevel)
-	log.Infof("%s %s starting up", AppName, AppVersion)
-
-	// Set the log level
-	logLevelStr := strings.TrimSpace(os.Getenv("LOG_LEVEL"))
-	if logLevelStr == "" {
-		log.SetLevel(log.DebugLevel)
-		log.Infof("LOG_LEVEL not set, defaulting to DEBUG")
-	} else if l, err := log.ParseLevel(strings.ToLower(logLevelStr)); err != nil {
-		log.SetLevel(log.InfoLevel)
-		log.Warnf("Invalid LOG_LEVEL=%q, defaulting to INFO: %v", logLevelStr, err)
-	} else {
-		log.SetLevel(l)
-	}
-	log.WithField("loglevel", strings.ToUpper(log.GetLevel().String())).Infof("current log level")
-}
-
 // main is the main function
 func main() {
+	// Setup logger
+	setupLogger()
+
 	// Load all settings, primarily from environment variables
 	loadSettings()
 
@@ -209,6 +179,39 @@ func loadSettings() {
 	AuthGwHttps = parseBoolEnv("AUTHGW_HTTPS", false)
 	AuthGwAddr = getEnv("AUTHGW_ADDR", "0.0.0.0")
 	AuthGwPort = getEnv("AUTHGW_PORT", "9999")
+}
+
+// setupLogger is initializing the logger and setting up the log level
+func setupLogger() {
+	// Force UTC timezone
+	time.Local = time.UTC // ensure default time.Local is UTC for timestamp generation
+
+	// Setup logging
+	log.SetOutput(os.Stdout)
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02T15:04:05.000",
+		DisableColors:   true,
+		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+			return f.Function, ""
+		},
+	})
+	log.SetLevel(log.DebugLevel)
+	log.Infof("%s %s starting up", AppName, AppVersion)
+
+	// Set the log level
+	logLevelStr := strings.TrimSpace(os.Getenv("LOG_LEVEL"))
+	if logLevelStr == "" {
+		log.SetLevel(log.DebugLevel)
+		log.Infof("LOG_LEVEL not set, defaulting to DEBUG")
+	} else if l, err := log.ParseLevel(strings.ToLower(logLevelStr)); err != nil {
+		log.SetLevel(log.InfoLevel)
+		log.Warnf("Invalid LOG_LEVEL=%q, defaulting to INFO: %v", logLevelStr, err)
+	} else {
+		log.SetLevel(l)
+	}
+	log.WithField("loglevel", strings.ToUpper(log.GetLevel().String())).Infof("current log level")
 }
 
 // --- Helper Functions ---
