@@ -65,6 +65,9 @@ var (
 	SftpgoApiUser string
 	// SftpgoApiPass is the password to use for authentication with the sftpgo API
 	SftpgoApiPass string
+	// SftpgoHomeDir is the home directory to use for the sftpgo user
+	// (default: /var/tmp; "{username}" will be replaced with the username)
+	SftpgoHomeDir string
 	// SftpgoVirtualFolderSync is a flag to enable/disable virtual folder sync after successful
 	// authentication to QNAP NAS: When enabled, it will create, delete or update virtual folders
 	// in sftpgo based on the shares accessible for specific user during time of login.
@@ -199,6 +202,8 @@ func loadSettings() {
 		log.Warn("SFTPGO_CHECK_CERT is disabled — certificate validation is skipped. " +
 			"Not recommended for production!")
 	}
+
+	SftpgoHomeDir = getEnv("SFTPGO_HOME_DIR", "/var/tmp")
 
 	// --- Auth Gateway Configuration ---
 	AuthGwHttps = parseBoolEnv("AUTHGW_HTTPS", false)

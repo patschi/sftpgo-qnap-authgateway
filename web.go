@@ -283,6 +283,9 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
 	userExpiry := time.Now().Add(5 * time.Minute).UnixMilli()
 
+	// Get home directory
+	homeDir := strings.ReplaceAll(SftpgoHomeDir, "{user}", req.Username)
+
 	// Build permissions map
 	perms := make(map[string][]string, len(virtualFolders)+1)
 
@@ -298,7 +301,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		Status:         1,
 		Username:       req.Username,
 		ExpirationDate: userExpiry,
-		HomeDir:        "/var/tmp",
+		HomeDir:        homeDir,
 		VirtualFolders: virtualFolders,
 		Permissions:    perms,
 	}
