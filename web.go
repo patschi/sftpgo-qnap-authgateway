@@ -107,6 +107,8 @@ func clientIPFromRequest(r *http.Request) string {
 // - building the virtual folders
 // - returning a response to sftpgo
 func webAuthHandler(w http.ResponseWriter, r *http.Request) {
+	defer closeIOBody(&r.Body)
+
 	// use custom logger from context
 	userLog := LoggerFromContext(r.Context())
 
@@ -133,12 +135,6 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// limit request body size to MaxBodyBytes
 	r.Body = http.MaxBytesReader(w, r.Body, int64(MaxBodyBytes))
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			userLog.WithError(err).Warn("auth: failed to close request body")
-		}
-	}(r.Body)
 
 	// decode body
 	var req authRequest
@@ -224,6 +220,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 			"failed to initialize authentication")
 		return sftpgoResponse{}, err
 	}
+
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -438,6 +435,17 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 // -----------------------------
 // Helpers
 // -----------------------------
+
+// closeIOBody closes the given io.ReadCloser and logs any errors.
+func closeIOBody(body *io.ReadCloser) {
+	if body == nil {
+		return
+	}
+	readErr := (*body).Close()
+	if readErr != nil {
+		log.WithError(readErr).Error("failed to close response body")
+	}
+}
 
 // writeDeny writes a JSON response to w with the given status code and error code.
 // It also sets the Content-Type header to application/json.

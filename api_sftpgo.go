@@ -170,12 +170,7 @@ func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Clien
 	if err != nil {
 		return "", http.StatusUnprocessableEntity, err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("sftpgo token request: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, readErr := io.ReadAll(resp.Body)
@@ -212,12 +207,7 @@ func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, toke
 	if err != nil {
 		return http.StatusUnprocessableEntity, err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("sftpgo logout: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -249,12 +239,7 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 	if err != nil {
 		return err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("sftpgo create folder: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -282,12 +267,7 @@ func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, t
 	if err != nil {
 		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("sftpgo get folder: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -327,12 +307,7 @@ func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client
 	if err != nil {
 		return err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("sftpgo update folder: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)

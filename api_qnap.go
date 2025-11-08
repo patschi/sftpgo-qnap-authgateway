@@ -79,11 +79,7 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 		// network/timeout errors
 		return "", err
 	}
-	defer func(Body io.ReadCloser) {
-		if readErr := Body.Close(); readErr != nil {
-			log.WithError(readErr).Error("login: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	bodyBytes, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
@@ -142,13 +138,7 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 	if err != nil {
 		return err
 	}
-
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithError(readErr).Error("logout: failed to close response body")
-		}
-	}(resp.Body)
+	defer closeIOBody(&resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, readErr := io.ReadAll(resp.Body)
@@ -189,13 +179,8 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 	if err != nil {
 		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		readErr := Body.Close()
-		if readErr != nil {
-			log.WithField("user", user).WithError(readErr).Error("getShares: failed to close response body")
-		}
-	}(resp.Body)
-
+	defer closeIOBody(&resp.Body)
+	
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		log.WithField("user", user).WithError(readErr).Error("getShares: failed to read response body")
