@@ -80,9 +80,8 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 		return "", err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("login: failed to close response body")
+		if readErr := Body.Close(); readErr != nil {
+			log.WithError(readErr).Error("login: failed to close response body")
 		}
 	}(resp.Body)
 
@@ -103,8 +102,8 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 
 	// Parse XML response
 	var xr qnapLoginResp
-	if err := xml.Unmarshal(bodyBytes, &xr); err != nil {
-		log.WithField("xml", reqBody).WithError(err).Warn("failed to parse xml login response")
+	if jsonErr := xml.Unmarshal(bodyBytes, &xr); jsonErr != nil {
+		log.WithField("xml", reqBody).WithError(jsonErr).Warn("failed to parse xml login response")
 		return "", fmt.Errorf("unable to parse login response")
 	}
 	log.WithField("response", fmt.Sprintf("%+v", xr)).Trace("parsed qnap api response struct")
@@ -145,16 +144,16 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 	}
 
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("logout: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("logout: failed to close response body")
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("logout failed HTTP %d: unable to read response body: %w", resp.StatusCode, err)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("logout failed HTTP %d: unable to read response body: %w", resp.StatusCode, readErr)
 		}
 		return fmt.Errorf("logout failed HTTP %d: %s", resp.StatusCode, string(body))
 	}
@@ -191,16 +190,16 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 		return nil, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithField("user", user).WithError(err).Error("getShares: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithField("user", user).WithError(readErr).Error("getShares: failed to close response body")
 		}
 	}(resp.Body)
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.WithField("user", user).WithError(err).Error("getShares: failed to read response body")
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		log.WithField("user", user).WithError(readErr).Error("getShares: failed to read response body")
+		return nil, fmt.Errorf("failed to read response body: %w", readErr)
 	}
 
 	log.WithFields(log.Fields{
@@ -214,8 +213,8 @@ func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid
 
 	// parse as array
 	var arr []qnapShareNode
-	if err := json.Unmarshal(body, &arr); err != nil {
-		return nil, fmt.Errorf("unable to parse get_tree response: %w", err)
+	if jsonErr := json.Unmarshal(body, &arr); jsonErr != nil {
+		return nil, fmt.Errorf("unable to parse get_tree response: %w", jsonErr)
 	}
 	log.WithFields(log.Fields{
 		"user":     user,

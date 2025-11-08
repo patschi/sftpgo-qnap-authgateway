@@ -61,7 +61,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		})
 
 		// Add the logger to the request context
-		ctx := context.WithValue(r.Context(), "logger", logger)
+		ctx := context.WithValue(r.Context(), LoggerKey, logger)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
@@ -240,8 +240,8 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Logout user from QNAP
 	userLog.Debug("logging user out of QNAP API...")
-	if err := qnapLogout(ctx, client, QnapURL, sid); err != nil {
-		userLog.WithError(err).Errorf("failed to logout of qnap. proceeding...")
+	if qlErr := qnapLogout(ctx, client, QnapURL, sid); qlErr != nil {
+		userLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
 	} else {
 		userLog.Info("destroyed login session for user in QNAP API")
 	}
@@ -326,7 +326,6 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.
 // It returns a map of permissions and a slice of virtual folders.
 func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
-
 	// Build virtual folders
 	folders := make([]sftpgoBackendFolder, 0, len(shares))
 	virtualFolders := make([]sftpgoVirtualFolder, 0, len(shares))
@@ -374,9 +373,10 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 
 		// build permissions
 		var vfPerms = SharePermsDeny // default to deny
-		if s.Cls == "w" {
+		switch s.Cls {
+		case "w":
 			vfPerms = SharePermsReadWrite
-		} else if s.Cls == "r" {
+		case "r":
 			vfPerms = SharePermsReadOnly
 		}
 

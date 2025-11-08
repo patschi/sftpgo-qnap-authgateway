@@ -37,6 +37,9 @@ const (
 	QnapSharePrefix = "QNAP_SHARE_"
 	// SftpgoManagedFolderDesc is the description text that will be added to every share description
 	SftpgoManagedFolderDesc = "QNAP Share: %s"
+
+	// LoggerKey is used for logger instance
+	LoggerKey = "logger"
 )
 
 var (
@@ -193,7 +196,7 @@ func setupLogger() {
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
 		DisableColors:   true,
-		CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
 			return f.Function, ""
 		},
 	})

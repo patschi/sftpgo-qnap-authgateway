@@ -96,16 +96,16 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 	for _, desiredFolder := range desiredFolders {
 		name := desiredFolder.Name
 		log.WithField("folder", name).Debug("checking folder")
-		err := sftpgoProcessFolder(ctx, log, client, token, desiredFolder)
-		if err != nil {
-			log.WithField("folder", name).WithError(err).Error("failed to create/update folder")
+		apiErr := sftpgoProcessFolder(ctx, log, client, token, desiredFolder)
+		if apiErr != nil {
+			log.WithField("folder", name).WithError(apiErr).Error("failed to create/update folder")
 			failedFolders = append(failedFolders, name)
 		}
 	}
 
 	// Logout
-	if code, err := sftpgoLogout(ctx, log, client, token); err != nil {
-		log.WithField("http_code", code).WithError(err).Error("failed to logout of sftpgo, proceeding...")
+	if apiCode, apiErr := sftpgoLogout(ctx, log, client, token); apiErr != nil {
+		log.WithField("http_code", apiCode).WithError(apiErr).Error("failed to logout of sftpgo, proceeding...")
 	}
 
 	return failedFolders, nil
@@ -132,9 +132,9 @@ func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Clien
 	// Create the folder if it does not exist
 	if code == 404 {
 		// Folder does not exist, create it
-		if err := sftpgoCreateFolder(ctx, log, client, token, desiredFolder); err != nil {
+		if apiErr := sftpgoCreateFolder(ctx, log, client, token, desiredFolder); apiErr != nil {
 			log.WithField("folder", name).WithField("http_code", code).Info("failed to create folder")
-			return err
+			return apiErr
 		}
 	}
 
@@ -144,9 +144,9 @@ func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Clien
 		if !folderStructsEqual(log, folder, desiredFolder) {
 			log.WithField("folder", name).Info("folder differs from desired state, updating...")
 			// Differences found, delete and recreate folder
-			if err := sftpgoUpdateFolder(ctx, log, client, token, desiredFolder); err != nil {
-				log.WithField("folder", name).WithError(err).Error("failed to update folder")
-				return err
+			if apiErr := sftpgoUpdateFolder(ctx, log, client, token, desiredFolder); apiErr != nil {
+				log.WithField("folder", name).WithError(apiErr).Error("failed to update folder")
+				return apiErr
 			}
 		}
 	}
@@ -157,7 +157,7 @@ func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Clien
 // sftpgoGetLoginToken authenticates towards sftpgo REST API and retrieves a login token.
 // It returns the token, HTTP status code, and error if any.
 func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Client) (string, int, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
 	if err != nil {
 		return "", http.StatusUnprocessableEntity, err
 	}
@@ -170,16 +170,16 @@ func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Clien
 		return "", http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("sftpgo token request: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo token request: failed to close response body")
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.WithError(err).Error("sftpgo token request: failed to read error response body")
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo token request: failed to read error response body")
 		}
 		return "", resp.StatusCode, fmt.Errorf("token request failed: %s", string(body))
 	}
@@ -188,8 +188,8 @@ func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Clien
 		AccessToken string `json:"access_token"`
 		ExpiresAt   string `json:"expires_at"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", resp.StatusCode, err
+	if jsonErr := json.NewDecoder(resp.Body).Decode(&data); jsonErr != nil {
+		return "", resp.StatusCode, jsonErr
 	}
 	log.WithField("expires_at", data.ExpiresAt).Trace("sftpgo token obtained")
 
@@ -199,7 +199,7 @@ func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Clien
 // sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error if any.
 // This will invalidate the token, so it cannot longer be used.
 func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, token string) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
 	if err != nil {
 		return http.StatusUnprocessableEntity, err
 	}
@@ -212,9 +212,9 @@ func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, toke
 		return http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("sftpgo logout: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo logout: failed to close response body")
 		}
 	}(resp.Body)
 
@@ -249,9 +249,9 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 		return err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("sftpgo create folder: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo create folder: failed to close response body")
 		}
 	}(resp.Body)
 
@@ -269,7 +269,7 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 // HTTP Error 404 means the folder does not exist.
 func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, name)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
@@ -282,9 +282,9 @@ func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, t
 		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("sftpgo get folder: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo get folder: failed to close response body")
 		}
 	}(resp.Body)
 
@@ -297,9 +297,9 @@ func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, t
 	log.WithField("folder", string(body)).Info("fetched folder details")
 
 	var folder sftpgoBackendFolder
-	if err := json.Unmarshal(body, &folder); err != nil {
-		log.WithError(err).Error("failed to unmarshal folder details")
-		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, err
+	if jsonErr := json.Unmarshal(body, &folder); jsonErr != nil {
+		log.WithError(jsonErr).Error("failed to unmarshal folder details")
+		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, jsonErr
 	}
 	return folder, 200, nil
 }
@@ -313,7 +313,7 @@ func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client
 	}
 
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, folder.Name)
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -327,9 +327,9 @@ func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client
 		return err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.WithError(err).Error("sftpgo update folder: failed to close response body")
+		readErr := Body.Close()
+		if readErr != nil {
+			log.WithError(readErr).Error("sftpgo update folder: failed to close response body")
 		}
 	}(resp.Body)
 
