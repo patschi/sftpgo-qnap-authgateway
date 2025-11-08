@@ -113,7 +113,6 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 	if xr.AuthSid != "" && xr.AuthPassed == "1" {
 		log.WithField("user", user).Debug("qnap login successful")
 		return xr.AuthSid, nil
-
 	} else if xr.AuthSid != "" || xr.AuthPassed != "1" {
 		log.WithField("user", user).Warn("qnap login failed")
 		return "", errAuthFailed

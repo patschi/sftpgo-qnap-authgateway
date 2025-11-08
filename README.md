@@ -1,8 +1,10 @@
 # sftpgo-qnap-authgateway
 
-Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and auto‑map their accessible shares as virtual folders. Fast, stateless, and logs every request with a request ID.
+Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and auto‑map their accessible shares as virtual
+folders. Fast, stateless, and logs every request with a request ID.
 
 ## Features
+
 - Authenticates via QNAP API
 - Builds SFTPGo virtual folders from QNAP shares
 - Per‑request cookies, strict timeouts, structured logging
@@ -10,23 +12,27 @@ Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and aut
 - Optional TLS cert verification for QNAP API
 
 ## Quick start
+
 - Create a container on QNAP with this application.
-  - Mount `/share` from QNAP to `/share` (or whatever is set in `QNAP_SHARE_PATH`) within the container.
+    - Mount `/share` from QNAP to `/share` (or whatever is set in `QNAP_SHARE_PATH`) within the container.
 - Configure the environment variables and start the service.
 - Point SFTPGo external auth to the service endpoint:
-  - `external_auth_hook=https://sftpgo-qnap-authgw/auth`
-  - `external_auth_scope=5` (only password and keyboard-interactive; any other are unsupported)
-- Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent this auth gateway to be blocked, instead of the user)
-- If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable REST API on SFTPGo and provide below environment variable.
+    - `external_auth_hook=https://sftpgo-qnap-authgw/auth`
+    - `external_auth_scope=5` (only password and keyboard-interactive; any other are unsupported)
+- Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent this
+  auth gateway to be blocked, instead of the user)
+- If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable REST
+  API on SFTPGo and provide below environment variable.
 
 ## Configuration
 
 ### Setup sftpgo service account (optional)
 
-If you want to enable automated virtual folder managed, this service needs a user account with proper permissions during the login. 
+If you want to enable automated virtual folder managed, this service needs a user account with proper permissions during
+the login.
 The user can either be created manually, or via API. As can be seen for API calls below.
 
-**Note**: Please replace URLs, username, and password accordingly. 
+**Note**: Please replace URLs, username, and password accordingly.
 
 ```shell
 # 1. Set all variables to your needs
@@ -88,6 +94,7 @@ curl -X GET "${GW_URL}/api/v2/logout" \
 | `LOG_LEVEL`          | `info`                             | Log level \(allowed: trace\|debug\|info\|warn\|error\)                     |
 
 ## Notes
+
 - QNAP API calls time out after 10s.
 - Sessions are logged out after shares are fetched.
 - User entries for sftpgo expire 5 minutes after issuance.
