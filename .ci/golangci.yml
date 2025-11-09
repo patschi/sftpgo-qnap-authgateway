@@ -249,6 +249,10 @@ linters:
         - switch
         - map
 
+    gosec:
+      excludes:
+        - G402 # e.g. TLS InsecureSkipVerify
+
     exhaustruct:
       # List of regular expressions to exclude struct packages and their names from checks.
       # Regular expressions must match complete canonical struct package/name/structname.
