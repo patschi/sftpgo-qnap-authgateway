@@ -66,8 +66,9 @@ go_lint:
   before_script:
     - apk add jq
   script:
+    - cp .ci/golangci.yml .golangci.yml
     # Write the code coverage report to gl-code-quality-report.json
-    - golangci-lint run --config .ci/golangci.yml --output.code-climate.path=../gl-code-quality-report.json
+    - golangci-lint run --config golangci.yml --output.code-climate.path=gl-code-quality-report.json
   after_script:
     # Print linting issues to stdout in the format: path/to/file:line description
     - cat gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
