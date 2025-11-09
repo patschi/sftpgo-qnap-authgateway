@@ -1,4 +1,5 @@
-FROM gcr.io/distroless/static:nonroot
-COPY /app/app /app
-USER nonroot:nonroot
+FROM gcr.io/distroless/static:latest
+ARG APP_DIR
+ARG APP_BIN
+COPY /$APP_DIR/$APP_BIN /app
 ENTRYPOINT ["/app"]

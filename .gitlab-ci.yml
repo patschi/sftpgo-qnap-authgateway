@@ -7,10 +7,10 @@
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
 variables:
-  GO_VERSION: "1.25"            # set your preferred Go version
+  GO_VERSION: "1.25"
   GOPATH: "$CI_PROJECT_DIR/.go"
   GO_BIN_DIR: "bin"
-  GO_MAIN_DIR: "."              # relative path to your main package
+  GO_MAIN_DIR: "."
   GO_BUILD_ARGS: ""
   GO_COVER_PACKAGES: ""
   GO_BUILD_NAME: "$CI_PROJECT_NAME"
@@ -185,28 +185,35 @@ go_build:
       - ./${GO_BIN_DIR}/${GO_BUILD_NAME}*
 
 # Build container
-build-container:
-  image:
-    name: moby/buildkit:rootless
-    entrypoint: [ "" ]
+build-docker:
   stage: build-container
+  image:
+    name: martizih/kaniko:debug
+    entrypoint: [""]
+  variables:
+    FF_KANIKO_OCI_STAGES: 'true'
   dependencies:
     - go_build
-  variables:
-    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
-    CACHE_IMAGE: $CI_REGISTRY_IMAGE:cache
-  before_script:
-    - mkdir -p ~/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json
+  before_script: []
   script:
-    - |
-      mkdir -vp app
-      cp -v ./${GO_BIN_DIR}/${GO_BUILD_NAME} ./app/app
-      buildctl-daemonless.sh build \
-        --frontend dockerfile.v0 \
-        --local context=. \
-        --local dockerfile=. \
-        --export-cache type=registry,ref=$CACHE_IMAGE \
-        --import-cache type=registry,ref=$CACHE_IMAGE \
-        --output type=image,name=$CI_REGISTRY_IMAGE:latest,push=true
-#        --output type=image,\"name=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA,$CI_REGISTRY_IMAGE:latest\",push=true
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$(echo -n $CI_DEPENDENCY_PROXY_SERVER | awk -F[:] '{print $1}')\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - >
+      /kaniko/executor
+      --cache=true
+      --registry-mirror=mirror.gcr.io
+      --compression=zstd
+      --compression-level=1
+      --compressed-caching=true
+      --single-snapshot
+      --annotation="org.opencontainers.image.title=$CI_PROJECT_NAME"
+      --annotation="org.opencontainers.image.version=${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+      --annotation="org.opencontainers.image.source=$CI_PROJECT_URL"
+      --annotation="org.opencontainers.image.revision=$CI_COMMIT_SHA"
+      --annotation="org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+      --annotation="org.opencontainers.image.ref.name=$CI_COMMIT_REF_NAME"
+      --build-arg="APP_DIR=$GO_BIN_DIR"
+      --build-arg="APP_BIN=$GO_BUILD_NAME"
+      --context="$CI_PROJECT_DIR"
+      --dockerfile="$CI_PROJECT_DIR/Dockerfile"
+      --destination="$CI_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
+      --destination="$CI_REGISTRY_IMAGE:latest"
