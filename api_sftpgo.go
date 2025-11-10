@@ -107,7 +107,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 
 	// Logout
 	if apiCode, apiErr := sftpgoLogout(ctx, log, client, token); apiErr != nil {
-		log.WithField("http_code", apiCode).WithError(apiErr).Error("failed to logout of sftpgo, proceeding...")
+		log.WithField("http_code", apiCode).WithError(apiErr).Error("failed to logout of sftpgo, proceeding")
 	}
 
 	return failedFolders, nil
@@ -160,7 +160,8 @@ func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Clien
 // sftpgoGetLoginToken authenticates towards sftpgo REST API and retrieves a login token.
 // It returns the token, HTTP status code, and error if any.
 func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Client) (string, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL), nil)
+	apiURL := fmt.Sprintf("%s/api/v2/token", SftpgoAPIURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return "", http.StatusUnprocessableEntity, err
 	}
@@ -197,7 +198,8 @@ func sftpgoGetLoginToken(ctx context.Context, log *log.Entry, client *http.Clien
 // sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error if any.
 // This will invalidate the token, so it cannot longer be used.
 func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, token string) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL), nil)
+	apiURL := fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return http.StatusUnprocessableEntity, err
 	}
@@ -290,8 +292,10 @@ func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client,
 	return folder, 200, nil
 }
 
-// sftpgoUpdateFolder updates a virtual folder in sftpgo REST API with the struct provided. It returns an error, if any.
-func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
+// sftpgoUpdateFolder updates a virtual folder via sftpgo REST API with the data provided.
+// It returns an error, if any.
+func sftpgoUpdateFolder(ctx context.Context, log *log.Entry, client *http.Client,
+	token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("failed to marshal folder for update")
