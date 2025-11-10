@@ -29,7 +29,6 @@ include:
 
 stages:
   - prepare
-  - go-lint
   - go-test
   - build-app
   - build-container
@@ -56,7 +55,7 @@ go_mod_download:
 # Lint code
 go_lint:
   image: "golangci/golangci-lint:latest-alpine"
-  stage: go-lint
+  stage: go-test
   needs: [ ]
   rules:
     - exists:
