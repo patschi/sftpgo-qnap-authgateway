@@ -100,7 +100,7 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 	var xr qnapLoginResp
 	if jsonErr := xml.Unmarshal(bodyBytes, &xr); jsonErr != nil {
 		log.WithField("xml", reqBody).WithError(jsonErr).Warn("failed to parse xml login response")
-		return "", fmt.Errorf("unable to parse login response")
+		return "", errors.New("unable to parse login response")
 	}
 	log.WithField("response", fmt.Sprintf("%+v", xr)).Trace("parsed qnap api response struct")
 
@@ -113,7 +113,7 @@ func qnapLogin(ctx context.Context, client *http.Client, baseURL string, auth au
 		return "", errAuthFailed
 	}
 
-	return "", fmt.Errorf("unknown error or unexpected response from qnap api")
+	return "", errors.New("unknown error or unexpected response from qnap api")
 }
 
 // qnapLogout logs out a user from a QNAP NAS via the authLogout API endpoint.
@@ -157,7 +157,6 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 // Returns a slice of qnapShareNode containing share details or an error in case of failure.
 func qnapGetShares(ctx context.Context, client *http.Client,
 	baseURL string, sid string, user string) ([]qnapShareNode, error) {
-
 	api := fmt.Sprintf("%s/cgi-bin/filemanager/utilRequest.cgi", baseURL)
 	params := url.Values{}
 	params.Set("func", "get_tree")

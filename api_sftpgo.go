@@ -68,7 +68,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		log.WithError(err).Error("failed to create cookie jar")
 		return []string{}, err
 	}
-	// nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
+	//nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -221,7 +221,8 @@ func sftpgoLogout(ctx context.Context, log *log.Entry, client *http.Client, toke
 }
 
 // sftpgoCreateFolder creates a virtual folder in sftpgo REST API. It returns an error if any.
-func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, folder sftpgoBackendFolder) error {
+func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client,
+	token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)
 	if err != nil {
 		log.WithError(err).Error("sftpgo create folder: failed to marshal folder payload")

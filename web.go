@@ -195,8 +195,8 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		userLog.WithError(err).Error("failed to write response")
+	if _, respErr := w.Write(data); respErr != nil {
+		userLog.WithError(respErr).Error("failed to write response")
 	}
 
 	userLog.Info("reported authentication success to sftpgo")
@@ -224,7 +224,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 		return sftpgoResponse{}, err
 	}
 
-	// nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
+	//nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -314,7 +314,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 	}
 
 	// Build response success
-	// nolint:exhaustruct // intentional; not all fields needed/work in progress
+	//nolint:exhaustruct // intentional; not all fields needed/work in progress
 	resp := sftpgoResponse{
 		Status:         1,
 		Username:       req.Username,
@@ -466,7 +466,7 @@ func closeIOBody(body *io.ReadCloser) {
 //	  }
 //	}
 func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message string) {
-	// nolint:exhaustruct // intentional; not all fields needed for error response
+	//nolint:exhaustruct // intentional; not all fields needed for error response
 	resp := sftpgoResponse{
 		Status:   0,
 		Username: "",

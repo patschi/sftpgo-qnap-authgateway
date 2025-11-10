@@ -203,7 +203,7 @@ func setupLogger() {
 	// Setup logging
 	log.SetOutput(os.Stdout)
 	log.SetReportCaller(true)
-	// nolint:exhaustruct // defaults acceptable
+	//nolint:exhaustruct // defaults acceptable
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
