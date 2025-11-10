@@ -181,7 +181,8 @@ func loadSettings() {
 	SftpgoAPIPass = getEnv("SFTPGO_API_PASS", "")
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
-	SftpgoManagedFolderDesc = getEnv("SFTPGO_FOLDER_DESCRIPTION", "QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway")
+	SftpgoManagedFolderDesc = getEnv("SFTPGO_FOLDER_DESCRIPTION",
+		"QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway")
 	SftpgoAccountExpiration = getEnv("SFTPGO_ACCOUNT_EXPIRATION", "5m")
 
 	var parseErr error
