@@ -261,7 +261,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	authLog.Info("qnap login workflow reported success")
 
 	// Fetch shares
-	shares, err := qnapGetShares(ctx, authLog, client, QnapURL, sid, req.Username)
+	shares, err := qnapGetShares(ctx, authLog, client, QnapURL, sid)
 	if err != nil {
 		authLog.WithError(err).Errorf("failed to fetch shares for user")
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
