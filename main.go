@@ -137,7 +137,7 @@ func main() {
 			"authgw": fmt.Sprintf("%s://%s:%s%s", authGwScheme, AuthGwAddr, AuthGwPort, AuthPath),
 			"qnap":   QnapURL,
 			"sftpgo": SftpgoAPIURL,
-		}).Info("starting QNAP auth gateway")
+		}).Info("starting qnap auth gateway")
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.WithError(err).Fatal("error starting HTTP server")
 			os.Exit(1)
@@ -178,7 +178,7 @@ func loadSettings() {
 	SftpgoAPIPass = getEnv("SFTPGO_API_PASS", "")
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
-	log.WithField("state", SftpgoVirtualFolderSync).Info("SFTPGO virtual folder sync state")
+	log.WithField("state", SftpgoVirtualFolderSync).Info("sftpgo virtual folder sync state")
 
 	if SftpgoVirtualFolderSync && SftpgoAPIPass == "" {
 		log.Fatal("SFTPGO_API_PASS is not set, but SFTPGO_FOLDER_SYNC is enabled!")

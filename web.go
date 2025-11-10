@@ -110,12 +110,12 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	defer closeIOBody(&r.Body)
 
 	// use custom logger from context
-	userLog := LoggerFromContext(r.Context())
+	authLog := LoggerFromContext(r.Context())
 
 	// a few sanity checks
 	// only allow POST
 	if r.Method != http.MethodPost {
-		userLog.WithFields(log.Fields{
+		authLog.WithFields(log.Fields{
 			"path":   r.URL.Path,
 			"method": r.Method,
 		}).Warn("invalid method accessed")
@@ -125,7 +125,7 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// only allow AuthPath call
 	if r.URL.Path != AuthPath {
-		userLog.WithFields(log.Fields{
+		authLog.WithFields(log.Fields{
 			"path":   r.URL.Path,
 			"method": r.Method,
 		}).Warn("invalid path accessed")
@@ -143,51 +143,51 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		var mbe *http.MaxBytesError
 		if errors.As(err, &mbe) {
 			// Body exceeded MaxBodyBytes
-			userLog.WithError(err).Warn("request body too large")
+			authLog.WithError(err).Warn("request body too large")
 			writeDeny(w, http.StatusRequestEntityTooLarge, "body_too_large",
 				fmt.Sprintf("request body too large (limit %d bytes)", MaxBodyBytes))
 			return
 		}
 
 		// otherwise it's a malformed JSON body'
-		userLog.WithError(err).Warn("malformed JSON body")
+		authLog.WithError(err).Warn("malformed JSON body")
 		writeDeny(w, http.StatusBadRequest, "invalid_json", "malformed JSON body")
 		return
 	}
 
 	// check for supported authentication methods
 	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TLSCert != "" {
-		userLog.Warn("unsupported authentication method")
+		authLog.Warn("unsupported authentication method")
 		writeDeny(w, http.StatusBadRequest, "unsupported_method", "unsupported authentication method")
 		return
 	}
 
 	// check if required parameters are present
 	if req.Username == "" || len(req.Password) == 0 || req.IP == "" {
-		userLog.Warn("missing required parameters")
+		authLog.Warn("missing required parameters")
 		writeDeny(w, http.StatusBadRequest, "missing_params", "missing required parameters")
 		return
 	}
 
 	// add username to all logs
-	userLog = userLog.WithField("user", req.Username)
+	authLog = authLog.WithField("user", req.Username)
 
-	userLog.WithFields(log.Fields{
+	authLog.WithFields(log.Fields{
 		"protocol": req.Protocol,
 		"ip":       req.IP,
 	}).Info("auth request received")
 
 	// Process authentication request
-	resp, err := performAuthentication(userLog, r, w, req)
+	resp, err := performAuthentication(authLog, r, w, req)
 	if err != nil {
-		userLog.WithError(err).Error("failed to process authentication request")
+		authLog.WithError(err).Error("failed to process authentication request")
 		return
 	}
 
 	// Encode response as JSON and return to the client
 	data, err := json.Marshal(resp)
 	if err != nil {
-		userLog.WithError(err).Error("failed to encode success response")
+		authLog.WithError(err).Error("failed to encode success response")
 		writeDeny(w, http.StatusInternalServerError, "json_encode_failed",
 			"failed to encode success response")
 		return
@@ -196,11 +196,11 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, respErr := w.Write(data); respErr != nil {
-		userLog.WithError(respErr).Error("failed to write response")
+		authLog.WithError(respErr).Error("failed to write response")
 	}
 
-	userLog.Info("reported authentication success to sftpgo")
-	userLog.WithField("response", string(data)).Trace("debug authentication json response")
+	authLog.Info("reported authentication success to sftpgo")
+	authLog.WithField("response", string(data)).Trace("debug authentication json response")
 }
 
 // performAuthentication performs the authentication workflow.
@@ -213,12 +213,12 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 // - fetch shares from QNAP API
 // - build virtual folders and permissions
 // - sync folders to sftpgo
-func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseWriter,
+func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseWriter,
 	req authRequest) (sftpgoResponse, error) {
 	// Create a per-request cookie jar and client (no shared cookies)
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		userLog.WithError(err).Error("failed to create cookie jar")
+		authLog.WithError(err).Error("failed to create cookie jar")
 		writeDeny(w, http.StatusInternalServerError, "internal_error",
 			"failed to initialize authentication")
 		return sftpgoResponse{}, err
@@ -241,61 +241,58 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 	defer cancel()
 
 	// qnapLogin uses ctx to abort the request if timeout
-	userLog.Debug("initiating qnap login")
-	sid, err := qnapLogin(ctx, client, QnapURL, req)
+	authLog.Debug("initiating qnap login")
+	sid, err := qnapLogin(ctx, authLog, client, QnapURL, req)
 	req.Password.Wipe() // Wipe password from memory
 
 	if err != nil {
 		// log and deny
 		// invalid credentials -> WARN (per policy)
 		if errors.Is(err, errAuthFailed) {
-			userLog.Warn("qnap authentication failed")
+			authLog.Warn("qnap authentication failed")
 			writeDeny(w, http.StatusUnauthorized, "auth_failed", "authentication failed")
 			return sftpgoResponse{}, err
 		}
 		// other errors (timeout, network) -> ERROR
-		userLog.WithError(err).Errorf("qnap login error")
+		authLog.WithError(err).Errorf("qnap login error")
 		writeDeny(w, http.StatusInternalServerError, "qnap_error", "qnap authentication error")
 		return sftpgoResponse{}, err
 	}
-	userLog.Info("qnap login workflow reported success")
+	authLog.Info("qnap login workflow reported success")
 
 	// Fetch shares
-	shares, err := qnapGetShares(ctx, client, QnapURL, sid, req.Username)
+	shares, err := qnapGetShares(ctx, authLog, client, QnapURL, sid, req.Username)
 	if err != nil {
-		userLog.WithError(err).Errorf("failed to fetch shares for user")
+		authLog.WithError(err).Errorf("failed to fetch shares for user")
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
 		return sftpgoResponse{}, err
 	}
 
 	// Shares received. Proceeding.
-	userLog.WithFields(log.Fields{
-		"user":  req.Username,
-		"count": len(shares),
-	}).Info("accessible shares retrieved")
+	authLog.WithField("count", len(shares)).Info("accessible shares retrieved")
 
 	// Logout user from QNAP
-	userLog.Debug("logging user out of QNAP API...")
-	if qlErr := qnapLogout(ctx, client, QnapURL, sid); qlErr != nil {
-		userLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
+	authLog.Debug("logging user out of QNAP API...")
+	if qlErr := qnapLogout(ctx, authLog, client, QnapURL, sid); qlErr != nil {
+		authLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
 	} else {
-		userLog.Info("destroyed login session for user in QNAP API")
+		authLog.Info("destroyed login session for user in QNAP API")
 	}
 
 	// Build virtual folders and permissions
-	folders, virtualFolders := buildVirtualFolders(userLog, shares)
+	folders, virtualFolders := buildVirtualFolders(authLog, shares)
 
 	// Initiate sftpgo virtual folder sync
-	userLog.WithField("folders", folders).Trace("all folders")
-	failedFolders, err := sftpgoSyncFolders(userLog, folders)
+	authLog.WithField("folders", folders).Trace("all folders")
+	failedFolders, err := sftpgoSyncFolders(authLog, folders)
 	if err != nil {
-		userLog.WithError(err).Error("failed to sync folders, denying login")
+		authLog.WithError(err).Error("failed to sync folders, denying login")
 		writeDeny(w, http.StatusInternalServerError, "sync_folders_failed",
 			"failed to sync folders")
 		return sftpgoResponse{}, err
 	}
 	filterInvalidFolders(&virtualFolders, failedFolders)
-	userLog.Info("sftpgo virtual folders synced")
+	authLog.Info("sftpgo virtual folders synced")
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
