@@ -11,6 +11,17 @@ folders. Fast, stateless, and logs every request with a request ID.
 - Simple JSON API for SFTPGo external auth
 - Optional TLS cert verification for QNAP API
 
+## Roadmap
+
+- Implement HTTPS webserver support
+- Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
+- Implement some basic caching for sftpgo virtual sync folders for performance (e.g. update only every 5s)
+
+## Requirements
+
+- QNAP NAS (tested QuTS hero 5.2.7.3297) with installed Container Station
+- SFTPGo (tested 2.7.0)
+
 ## Quick start
 
 - Create a container on QNAP with this application.

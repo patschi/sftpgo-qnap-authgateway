@@ -16,9 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// TODO: Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
-// TODO: Implement some basic caching for sftpgo virtual sync folders for performance (e.g. update only every 5s)
-
 // -----------------------------
 // Configuration constants/variables
 // -----------------------------
