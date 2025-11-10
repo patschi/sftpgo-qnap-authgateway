@@ -47,6 +47,8 @@ go_mod_download:
     paths:
       - .go/pkg/mod/
   artifacts:
+    expose_as: 'Go Mod Download'
+    expire_in: 1 week
     paths:
       - .go/pkg/mod/
   rules:
@@ -73,6 +75,8 @@ go_lint:
     # Print linting issues to stdout in the format: path/to/file:line description
     - cat gl-code-quality-report.json | jq -r '.[] | "\(.location.path):\(.location.lines.begin) \(.description)"'
   artifacts:
+    expose_as: 'Go Lint Report'
+    expire_in: 1 week
     reports:
       codequality: gl-code-quality-report.json
     paths:
@@ -103,6 +107,7 @@ go_test:
   coverage: '/total:\s+\(statements\)\s+\d+\.\d+%/'
   artifacts:
     expose_as: 'Go Test Coverage Report'
+    expire_in: 1 week
     paths:
       - coverage.html
       - coverage.out
@@ -158,9 +163,6 @@ go_mod_updates:
   needs:
     - job: go_mod_download
       optional: true
-  rules:
-    - exists:
-        - '**/go.sum'
   allow_failure: true
   before_script:
     - apk add jq
@@ -173,6 +175,9 @@ go_mod_updates:
         jq -c -r 'select(.Update != null and .Indirect == null) | "\(.Path) \(.Version) [\(.Update.Version)]"')
       printf "$UPDATES\n"
       if [ $(echo $UPDATES | wc -w) != "0" ]; then exit 1; fi
+  rules:
+    - exists:
+        - '**/go.sum'
 
 # Build for current OS/arch
 go_build:
@@ -182,6 +187,8 @@ go_build:
     - export CGO_ENABLED=0
     - go build ${GO_BUILD_ARGS} -o ./${GO_BIN_DIR}/${GO_BUILD_NAME} ${GO_MAIN_DIR}
   artifacts:
+    expose_as: 'Go Build'
+    expire_in: 1 week
     paths:
       - ./${GO_BIN_DIR}/${GO_BUILD_NAME}*
 
