@@ -84,6 +84,11 @@ var (
 	// in sftpgo based on the shares accessible for specific user during time of login.
 	SftpgoVirtualFolderSync bool
 
+	// SftpgoAccountExpiration is the duration for which the user account will be valid after successful login.
+	SftpgoAccountExpiration string
+	// SftpgoAccountExpirationTime is the parsed duration value of SftpgoAccountExpiration.
+	SftpgoAccountExpirationTime time.Duration
+
 	SharePermsDeny      []string
 	SharePermsListOnly  = []string{"list"}
 	SharePermsReadOnly  = []string{"list", "download"}
@@ -179,6 +184,14 @@ func loadSettings() {
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
 	log.WithField("state", SftpgoVirtualFolderSync).Info("sftpgo virtual folder sync state")
+
+	SftpgoAccountExpiration = getEnv("SFTPGO_ACCOUNT_EXPIRATION", "5m")
+
+	var parseErr error
+	SftpgoAccountExpirationTime, parseErr = time.ParseDuration(SftpgoAccountExpiration)
+	if parseErr != nil {
+		log.WithError(parseErr).Fatalf("invalid SFTPGO_ACCOUNT_EXPIRATION value: %q", SftpgoAccountExpiration)
+	}
 
 	if SftpgoVirtualFolderSync && SftpgoAPIPass == "" {
 		log.Fatal("SFTPGO_API_PASS is not set, but SFTPGO_FOLDER_SYNC is enabled!")

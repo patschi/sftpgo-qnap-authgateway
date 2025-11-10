@@ -124,7 +124,7 @@ func sftpgoProcessFolder(ctx context.Context, authLog *log.Entry, client *http.C
 
 	folder, code, err := sftpgoGetFolder(ctx, authLog, client, token, name)
 	// We consider 200 and 404 to be fine (200 = folder exists, 404 = folder does not exist)
-	if code == 200 || code == 404 {
+	if code == http.StatusOK || code == http.StatusNotFound {
 		// soft-fail. don't error out.
 		err = nil
 	}
@@ -135,7 +135,7 @@ func sftpgoProcessFolder(ctx context.Context, authLog *log.Entry, client *http.C
 	}
 
 	// Create the folder if it does not exist
-	if code == 404 {
+	if code == http.StatusNotFound {
 		// Folder does not exist, create it
 		if apiErr := sftpgoCreateFolder(ctx, authLog, client, token, desiredFolder); apiErr != nil {
 			authLog.WithField("folder", name).WithField("http_code", code).Info("failed to create folder")
@@ -144,7 +144,7 @@ func sftpgoProcessFolder(ctx context.Context, authLog *log.Entry, client *http.C
 	}
 
 	// Folder exists, check for differences
-	if code == 200 {
+	if code == http.StatusOK {
 		// Compare "folder" and "desiredFolder" structs recursively
 		if !folderStructsEqual(authLog, folder, desiredFolder) {
 			authLog.WithField("folder", name).Info("folder differs from desired state, updating...")
@@ -249,7 +249,7 @@ func sftpgoCreateFolder(ctx context.Context, authLog *log.Entry, client *http.Cl
 	}
 	defer closeIOBody(&resp.Body)
 
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("create folder failed: %s", string(body))
 	}
@@ -291,7 +291,7 @@ func sftpgoGetFolder(ctx context.Context, authLog *log.Entry, client *http.Clien
 		authLog.WithError(jsonErr).Error("failed to unmarshal folder details")
 		return sftpgoBackendFolder{}, http.StatusUnprocessableEntity, jsonErr
 	}
-	return folder, 200, nil
+	return folder, http.StatusOK, nil
 }
 
 // sftpgoUpdateFolder updates a virtual folder via sftpgo REST API with the data provided.
@@ -320,7 +320,7 @@ func sftpgoUpdateFolder(ctx context.Context, authLog *log.Entry, client *http.Cl
 	}
 	defer closeIOBody(&resp.Body)
 
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("update folder failed: %s", string(body))
 	}

@@ -43,6 +43,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		start := time.Now().UTC()
 		ip := clientIPFromRequest(r)
 
+		//nolint:mnd
 		requestID := shortRequestID(8)
 		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Server", fmt.Sprintf("%s/%s", AppName, AppVersion))
@@ -296,7 +297,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
-	userExpiry := time.Now().Add(5 * time.Minute).UnixMilli()
+	userExpiry := time.Now().Add(SftpgoAccountExpirationTime).UnixMilli()
 
 	// Get home directory
 	homeDir := strings.ReplaceAll(SftpgoHomeDir, "{user}", req.Username)
@@ -487,8 +488,8 @@ func LoggerFromContext(ctx context.Context) *log.Entry {
 }
 
 // shortRequestID generates a random hexadecimal string of length n or a fallback time-based string on failure.
-func shortRequestID(n int) string {
-	b := make([]byte, n)
+func shortRequestID(bytes int) string {
+	b := make([]byte, bytes)
 	if _, err := rand.Read(b); err != nil {
 		// fallback in case of failure
 		return time.Now().Format("150405.000") // HHMMSS.milliseconds
