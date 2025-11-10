@@ -224,7 +224,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 		return sftpgoResponse{}, err
 	}
 
-	//nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
+	//nolint:gosec,exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,

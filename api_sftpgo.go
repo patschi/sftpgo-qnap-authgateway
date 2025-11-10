@@ -68,7 +68,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		log.WithError(err).Error("failed to create cookie jar")
 		return []string{}, err
 	}
-	//nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
+	//nolint:gosec,exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -229,7 +229,8 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL), bytes.NewBuffer(payload))
+	apiURL := fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL)
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
