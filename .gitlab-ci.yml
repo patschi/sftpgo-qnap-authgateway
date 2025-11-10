@@ -65,7 +65,7 @@ go_lint:
   before_script:
     - apk add jq
   script:
-    - cp .ci/golangci.yml .golangci.yml
+    - cp .gitlab/golangci.yml .golangci.yml
     # Write the code coverage report to gl-code-quality-report.json
     - golangci-lint run --output.code-climate.path=gl-code-quality-report.json
   after_script:
