@@ -157,7 +157,7 @@ func qnapLogout(ctx context.Context, authLog *log.Entry, client *http.Client, ba
 // It takes a context, HTTP client, NAS base URL, session ID, and user identifier as parameters.
 // Returns a slice of qnapShareNode containing share details or an error in case of failure.
 func qnapGetShares(ctx context.Context, authLog *log.Entry, client *http.Client,
-	baseURL string, sid string, user string) ([]qnapShareNode, error) {
+	baseURL string, sid string) ([]qnapShareNode, error) {
 	api := fmt.Sprintf("%s/cgi-bin/filemanager/utilRequest.cgi", baseURL)
 	params := url.Values{}
 	params.Set("func", "get_tree")
