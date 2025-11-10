@@ -43,11 +43,6 @@ const (
 	// QnapSharePrefix is the prefix that will be added for every share name
 	// This will be used as a human-readable identifier for the share in sftpgo
 	QnapSharePrefix = "QNAP_SHARE_"
-	// SftpgoManagedFolderDesc is the description text that will be added to every share description
-	SftpgoManagedFolderDesc = "QNAP Share: %s"
-
-	// LoggerKey is used for logger instance
-	LoggerKey = "logger"
 )
 
 var (
@@ -83,6 +78,8 @@ var (
 	// authentication to QNAP NAS: When enabled, it will create, delete or update virtual folders
 	// in sftpgo based on the shares accessible for specific user during time of login.
 	SftpgoVirtualFolderSync bool
+	// SftpgoManagedFolderDesc is the description text that will be added to every share description
+	SftpgoManagedFolderDesc string
 
 	// SftpgoAccountExpiration is the duration for which the user account will be valid after successful login.
 	SftpgoAccountExpiration string
@@ -183,8 +180,7 @@ func loadSettings() {
 	SftpgoAPIPass = getEnv("SFTPGO_API_PASS", "")
 
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
-	log.WithField("state", SftpgoVirtualFolderSync).Info("sftpgo virtual folder sync state")
-
+	SftpgoManagedFolderDesc = getEnv("SFTPGO_FOLDER_DESCRIPTION", "QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway")
 	SftpgoAccountExpiration = getEnv("SFTPGO_ACCOUNT_EXPIRATION", "5m")
 
 	var parseErr error
