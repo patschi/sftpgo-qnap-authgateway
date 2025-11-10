@@ -43,7 +43,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		start := time.Now().UTC()
 		ip := clientIPFromRequest(r)
 
-		//nolint:mnd
+		//nolint:mnd // request id length is considered fixed and there is no need to adjust
 		requestID := shortRequestID(8)
 		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Server", fmt.Sprintf("%s/%s", AppName, AppVersion))

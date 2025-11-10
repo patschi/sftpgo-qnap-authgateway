@@ -152,6 +152,7 @@ func main() {
 	<-stop
 	log.Info("shutdown signal received, stopping...")
 
+	//nolint:mnd // internal fixed timeout to allow the HTTP server to gracefully shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
