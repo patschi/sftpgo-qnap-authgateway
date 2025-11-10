@@ -230,7 +230,7 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 	}
 
 	apiURL := fmt.Sprintf("%s/api/v2/folders", SftpgoAPIURL)
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,8 @@ func sftpgoCreateFolder(ctx context.Context, log *log.Entry, client *http.Client
 // sftpgoGetFolder retrieves a specific virtual folder by name from sftpgo REST API.
 // It returns the folder, HTTP status code, and error if any. The folder is returned as a struct.
 // HTTP Error 404 means the folder does not exist.
-func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client, token, name string) (sftpgoBackendFolder, int, error) {
+func sftpgoGetFolder(ctx context.Context, log *log.Entry, client *http.Client,
+	token, name string) (sftpgoBackendFolder, int, error) {
 	url := fmt.Sprintf("%s/api/v2/folders/%s", SftpgoAPIURL, name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
