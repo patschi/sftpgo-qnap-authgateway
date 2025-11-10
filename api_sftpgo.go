@@ -68,6 +68,7 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 		log.WithError(err).Error("failed to create cookie jar")
 		return []string{}, err
 	}
+	// nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -114,7 +115,8 @@ func sftpgoSyncFolders(log *log.Entry, desiredFolders []sftpgoBackendFolder) ([]
 
 // sftpgoProcessFolder is processing and taking care of single folders. It will create/update as necessary.
 // It returns an error if something went wrong.
-func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Client, token string, desiredFolder sftpgoBackendFolder) error {
+func sftpgoProcessFolder(ctx context.Context, log *log.Entry, client *http.Client,
+	token string, desiredFolder sftpgoBackendFolder) error {
 	name := desiredFolder.Name
 	log.WithField("folder", name).Debug("processing folder")
 

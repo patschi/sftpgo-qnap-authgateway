@@ -155,7 +155,8 @@ func qnapLogout(ctx context.Context, client *http.Client, baseURL string, sid st
 // qnapGetShares retrieves a list of shared folders from a QNAP NAS via the get_tree API endpoint.
 // It takes a context, HTTP client, NAS base URL, session ID, and user identifier as parameters.
 // Returns a slice of qnapShareNode containing share details or an error in case of failure.
-func qnapGetShares(ctx context.Context, client *http.Client, baseURL string, sid string, user string) ([]qnapShareNode, error) {
+func qnapGetShares(ctx context.Context, client *http.Client,
+	baseURL string, sid string, user string) ([]qnapShareNode, error) {
 
 	api := fmt.Sprintf("%s/cgi-bin/filemanager/utilRequest.cgi", baseURL)
 	params := url.Values{}

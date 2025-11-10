@@ -61,7 +61,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		})
 
 		// Add the logger to the request context
-		ctx := context.WithValue(r.Context(), LoggerKey, logger)
+		ctx := context.WithValue(r.Context(), loggerContextKey, logger)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
@@ -195,7 +195,9 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		userLog.WithError(err).Error("failed to write response")
+	}
 
 	userLog.Info("reported authentication success to sftpgo")
 	userLog.WithField("response", string(data)).Trace("debug authentication json response")
@@ -211,7 +213,8 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 // - fetch shares from QNAP API
 // - build virtual folders and permissions
 // - sync folders to sftpgo
-func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseWriter, req authRequest) (sftpgoResponse, error) {
+func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseWriter,
+	req authRequest) (sftpgoResponse, error) {
 	// Create a per-request cookie jar and client (no shared cookies)
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -221,6 +224,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 		return sftpgoResponse{}, err
 	}
 
+	// nolint:gosec(G402),exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
 		Timeout: HTTPTimeout,
@@ -310,6 +314,7 @@ func performAuthentication(userLog *log.Entry, r *http.Request, w http.ResponseW
 	}
 
 	// Build response success
+	// nolint:exhaustruct // intentional; not all fields needed/work in progress
 	resp := sftpgoResponse{
 		Status:         1,
 		Username:       req.Username,
@@ -340,7 +345,7 @@ func filterInvalidFolders(virtualFolders *[]sftpgoVirtualFolder, failedFolders [
 				filteredFolders = append(filteredFolders, vf)
 			}
 		}
-		virtualFolders = &filteredFolders
+		*virtualFolders = filteredFolders
 	}
 }
 
@@ -461,6 +466,7 @@ func closeIOBody(body *io.ReadCloser) {
 //	  }
 //	}
 func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message string) {
+	// nolint:exhaustruct // intentional; not all fields needed for error response
 	resp := sftpgoResponse{
 		Status:   0,
 		Username: "",
@@ -476,7 +482,7 @@ func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message stri
 
 // LoggerFromContext is a function to get logger from other context
 func LoggerFromContext(ctx context.Context) *log.Entry {
-	if logger, ok := ctx.Value("logger").(*log.Entry); ok {
+	if logger, ok := ctx.Value(loggerContextKey).(*log.Entry); ok {
 		return logger
 	}
 	// Return default logger if none in context

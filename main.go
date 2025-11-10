@@ -90,6 +90,12 @@ var (
 	SharePermsReadWrite = []string{"*"}
 )
 
+// contextKey is a string wrapper for context keys.
+type contextKey string
+
+// loggerContextKey is the context key for the logger instance.
+const loggerContextKey contextKey = "logger"
+
 // -----------------------------
 // Main
 // -----------------------------
@@ -194,12 +200,10 @@ func loadSettings() {
 
 // setupLogger is initializing the logger and setting up the log level.
 func setupLogger() {
-	// Force UTC timezone
-	time.Local = time.UTC // ensure default time.Local is UTC for timestamp generation
-
 	// Setup logging
 	log.SetOutput(os.Stdout)
 	log.SetReportCaller(true)
+	// nolint:exhaustruct // defaults acceptable
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
