@@ -224,5 +224,4 @@ build-docker:
       --build-arg="APP_BIN=$GO_BUILD_NAME"
       --context="$CI_PROJECT_DIR"
       --dockerfile="$CI_PROJECT_DIR/Dockerfile"
-      --destination="$CI_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
       --destination="$CI_REGISTRY_IMAGE:latest"
