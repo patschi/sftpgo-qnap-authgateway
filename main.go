@@ -26,8 +26,15 @@ const (
 	// AppVersion is the current version of the application
 	AppVersion = "0.1.0"
 
-	// AuthPath server listen address and endpoint
+	// AuthGwAddr defines to which address it's binding it on
+	AuthGwAddr = "0.0.0.0"
+	// AuthGwPort defines to which port it's binding it on'
+	AuthGwPort = "9999"
+	// AuthPath listen path endpoint for authentication
 	AuthPath = "/auth"
+	// AuthHealthPath listen path endpoint for health check
+	AuthHealthPath = "/healthz"
+
 	// MaxBodyBytes is limiting body size for JSON parsing
 	MaxBodyBytes = 5 * 1024 // 5 KiB
 
@@ -46,10 +53,6 @@ const (
 )
 
 var (
-	// AuthGwAddr defines to which address it's binding it on
-	AuthGwAddr string
-	// AuthGwPort defines to which port it's binding it on'
-	AuthGwPort string
 	// AuthGwHTTPS defines if it's running in HTTPS mode or not'
 	AuthGwHTTPS bool
 
@@ -113,7 +116,7 @@ func main() {
 	// HTTP server mux and handler
 	mux := http.NewServeMux()
 	mux.HandleFunc(AuthPath, webAuthHandler)
-	mux.HandleFunc("/healthz", webHealthHandler)
+	mux.HandleFunc(AuthHealthPath, webHealthHandler)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),
@@ -206,8 +209,6 @@ func loadSettings() {
 
 	// --- Auth Gateway Configuration ---
 	AuthGwHTTPS = parseBoolEnv("AUTHGW_HTTPS", false)
-	AuthGwAddr = getEnv("AUTHGW_ADDR", "0.0.0.0")
-	AuthGwPort = getEnv("AUTHGW_PORT", "9999")
 }
 
 // setupLogger is initializing the logger and setting up the log level.

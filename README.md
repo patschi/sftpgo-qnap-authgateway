@@ -101,9 +101,7 @@ curl -X GET "${GW_URL}/api/v2/logout" \
 | `SFTPGO_API_PASS`           | none                                                       | sftpgo service account password; required for virtual folder sync          |
 | `SFTPGO_CHECK_CERT`         | `true`                                                     | Verify sftpgo TLS cert; set to `false` to disable verification             |
 | `SFTPGO_HOMEDIR`            | `/var/tmp`                                                 | sftpgo requires this, empty folder is OK; "{user}" is replaced to username |
-| `AUTHGW_HTTPS`              | `false`                                                    | HTTPS mode \(not implemented yet\)                                         |
-| `AUTHGW_ADDR`               | `0.0.0.0`                                                  | Bind address                                                               |
-| `AUTHGW_PORT`               | `9999`                                                     | Listen port                                                                |
+| `AUTHGW_TLS`                | `false`                                                    | Enable TLS and HTTPS \(not implemented yet\)                               |
 | `LOG_LEVEL`                 | `info`                                                     | Log level \(allowed: trace\|debug\|info\|warn\|error\)                     |
 
 ## Notes
