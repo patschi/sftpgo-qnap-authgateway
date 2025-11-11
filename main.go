@@ -113,6 +113,7 @@ func main() {
 	// HTTP server mux and handler
 	mux := http.NewServeMux()
 	mux.HandleFunc(AuthPath, webAuthHandler)
+	mux.HandleFunc("/healthz", webHealthHandler)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", AuthGwAddr, AuthGwPort),

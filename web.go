@@ -124,16 +124,6 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// only allow AuthPath call
-	if r.URL.Path != AuthPath {
-		authLog.WithFields(log.Fields{
-			"path":   r.URL.Path,
-			"method": r.Method,
-		}).Warn("invalid path accessed")
-		http.NotFound(w, r)
-		return
-	}
-
 	// limit request body size to MaxBodyBytes
 	r.Body = http.MaxBytesReader(w, r.Body, int64(MaxBodyBytes))
 
@@ -202,6 +192,43 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	authLog.Info("reported authentication success to sftpgo")
 	authLog.WithField("response", string(data)).Trace("debug authentication json response")
+}
+
+// webHealthHandler is the health check endpoint. For example, used by docker health checks.
+func webHealthHandler(w http.ResponseWriter, r *http.Request) {
+	// use custom logger from context
+	authLog := LoggerFromContext(r.Context())
+
+	// a few sanity checks
+	// only allow POST
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		authLog.WithFields(log.Fields{
+			"path":   r.URL.Path,
+			"method": r.Method,
+		}).Warn("invalid method accessed")
+		http.Error(w, "method not implemented", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Build response success in JSON format
+	status := map[string]string{
+		"status": "ok",
+	}
+
+	data, err := json.Marshal(status)
+	if err != nil {
+		authLog.WithError(err).Error("failed to encode health response")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if _, respErr := w.Write(data); respErr != nil {
+		authLog.WithError(respErr).Error("failed to write response")
+	}
+
+	authLog.Info("reported authentication success to sftpgo")
 }
 
 // performAuthentication performs the authentication workflow.
