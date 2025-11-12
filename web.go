@@ -200,7 +200,7 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 	authLog := LoggerFromContext(r.Context())
 
 	// a few sanity checks
-	// only allow POST
+	// only allow GET or HEAD
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		authLog.WithFields(log.Fields{
 			"path":   r.URL.Path,
@@ -210,25 +210,44 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build response success in JSON format
-	status := map[string]string{
-		"status": "ok",
+	data := []byte("")
+	// Only build response body for GET requests
+	if r.Method == http.MethodGet {
+		// Default value for uptime is 0
+		var uptime int64 = 0
+
+		// Get application start time
+		AppStartTimeParsed, parseErr := time.Parse(time.RFC3339Nano, AppStartTime)
+		if parseErr != nil {
+			authLog.WithError(parseErr).Error("failed to parse app start time")
+		} else {
+			uptime = int64(time.Since(AppStartTimeParsed).Seconds())
+		}
+
+		// Build response success in JSON format
+		status := map[string]interface{}{
+			"status": "ok",
+			"uptime": uptime,
+		}
+
+		// Encode response as JSON and return to the client
+		var err error
+		data, err = json.Marshal(status)
+		if err != nil {
+			authLog.WithError(err).Error("failed to encode health response")
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
 	}
 
-	data, err := json.Marshal(status)
-	if err != nil {
-		authLog.WithError(err).Error("failed to encode health response")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, respErr := w.Write(data); respErr != nil {
 		authLog.WithError(respErr).Error("failed to write response")
 	}
 
-	authLog.Info("reported authentication success to sftpgo")
+	log.WithField("response", string(data)).Trace("debug health check response")
 }
 
 // performAuthentication performs the authentication workflow.
