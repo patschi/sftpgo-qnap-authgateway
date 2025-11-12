@@ -53,6 +53,9 @@ const (
 )
 
 var (
+	// AppStartTime is the time when the application started
+	AppStartTime string
+
 	// AuthGwHTTPS defines if it's running in HTTPS mode or not'
 	AuthGwHTTPS bool
 
@@ -107,6 +110,9 @@ const loggerContextKey contextKey = "logger"
 
 // main is the main function.
 func main() {
+	// Remember the application start time
+	AppStartTime = time.Now().Format(time.RFC3339Nano)
+
 	// Setup logger
 	setupLogger()
 
