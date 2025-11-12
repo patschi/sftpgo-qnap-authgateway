@@ -7,7 +7,6 @@
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
 variables:
-  GO_VERSION: "1.25"
   GOPATH: "$CI_PROJECT_DIR/.go"
   GO_BIN_DIR: "bin"
   GO_MAIN_DIR: "."
@@ -37,7 +36,7 @@ stages:
 
 # Download dependencies
 go_mod_download:
-  image: "golang:${GO_VERSION}-alpine"
+  image: golang:1.25.3
   stage: prepare
   script:
     - mkdir -p $GOPATH
@@ -57,7 +56,7 @@ go_mod_download:
 
 # Lint code
 go_lint:
-  image: "golangci/golangci-lint:latest-alpine"
+  image: golangci/golangci-lint:v2.6.1-alpine
   stage: go-test
   needs: [ ]
   rules:
@@ -85,7 +84,7 @@ go_lint:
 
 # Unit tests with coverage
 go_test:
-  image: "golang:${GO_VERSION}-alpine"
+  image: golang:1.25.3
   stage: go-test
   needs:
     - job: go_mod_download
@@ -123,7 +122,7 @@ go_test:
 
 # Race condition tests
 go_test_race:
-  image: "golang:${GO_VERSION}"
+  image: golang:1.25.3
   stage: go-test
   needs:
     - job: go_mod_download
@@ -139,7 +138,7 @@ go_test_race:
 
 # Check if go mod tidy produces any changes
 go_mod_tidy:
-  image: "golang:${GO_VERSION}-alpine"
+  image: golang:1.25.3
   stage: go-test
   needs:
     - job: go_mod_download
@@ -158,14 +157,14 @@ go_mod_tidy:
 
 # Job to check for available updates for any direct module dependencies.
 go_mod_updates:
-  image: "golang:${GO_VERSION}-alpine"
+  image: golang:1.25.3
   stage: go-test
   needs:
     - job: go_mod_download
       optional: true
   allow_failure: true
   before_script:
-    - apk add jq
+    - apt-get -y update && apt-get install --no-install-recommends jq
   script:
     # Waiting on https://github.com/golang/go/issues/40364 to allow listing
     # only direct dependencies so don't have to check JSON.
@@ -181,7 +180,7 @@ go_mod_updates:
 
 # Build for current OS/arch
 go_build:
-  image: "golang:${GO_VERSION}-alpine"
+  image: golang:1.25.3
   stage: build-app
   script:
     - export CGO_ENABLED=0
@@ -190,13 +189,13 @@ go_build:
     expose_as: 'Go Build'
     expire_in: 1 week
     paths:
-      - ./${GO_BIN_DIR}/${GO_BUILD_NAME}*
+      - ./${GO_BIN_DIR}/${GO_BUILD_NAME}
 
 # Build container
 build-docker:
   stage: build-container
   image:
-    name: martizih/kaniko:debug
+    name: martizih/kaniko:v1.26.1-debug
     entrypoint: [""]
   variables:
     FF_KANIKO_OCI_STAGES: 'true'
