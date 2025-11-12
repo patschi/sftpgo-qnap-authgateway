@@ -11,14 +11,8 @@
 # Feel free to adapt it to suit your needs.
 # If this config helps you, please consider keeping a link to this file (see the next comment).
 
+# From: https://gitlab.com/gitlab-ci-utils/config-files/-/raw/main/Linters/.golangci.yml
 # Based on https://gist.github.com/maratori/47a4d00457a92aa426dbd48a18776322
-
-#######
-# CHANGES
-# exhaustruct
-# gosec: G402
-# perfsprint
-
 ---
 version: '2'
 

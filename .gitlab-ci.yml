@@ -62,12 +62,9 @@ go_lint:
   rules:
     - exists:
         - '**/*.go'
-  variables:
-    CONFIG_FILE_LINK: "https://gitlab.com/gitlab-ci-utils/config-files/-/raw/main/Linters/.golangci.yml"
   before_script:
     - apk add jq
   script:
-    - cp .gitlab/golangci.yml .golangci.yml
     # Write the code coverage report to gl-code-quality-report.json
     - golangci-lint run --output.code-climate.path=gl-code-quality-report.json
   after_script:
@@ -164,7 +161,7 @@ go_mod_updates:
       optional: true
   allow_failure: true
   before_script:
-    - apt-get -y update && apt-get install --no-install-recommends jq
+    - apt-get -y update && apt-get install -y --no-install-recommends jq
   script:
     # Waiting on https://github.com/golang/go/issues/40364 to allow listing
     # only direct dependencies so don't have to check JSON.
