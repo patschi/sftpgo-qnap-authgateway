@@ -214,14 +214,14 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 	// Only build response body for GET requests
 	if r.Method == http.MethodGet {
 		// Default value for uptime is 0
-		var uptime int64 = 0
+		var uptime int64
 
 		// Get application start time
-		AppStartTimeParsed, parseErr := time.Parse(time.RFC3339Nano, AppStartTime)
+		appStartTimeParsed, parseErr := time.Parse(time.RFC3339Nano, AppStartTime)
 		if parseErr != nil {
 			authLog.WithError(parseErr).Error("failed to parse app start time")
 		} else {
-			uptime = int64(time.Since(AppStartTimeParsed).Seconds())
+			uptime = int64(time.Since(appStartTimeParsed).Seconds())
 		}
 
 		// Build response success in JSON format
