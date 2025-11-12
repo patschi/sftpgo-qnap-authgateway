@@ -187,6 +187,10 @@ go_build:
     expire_in: 1 week
     paths:
       - ./${GO_BIN_DIR}/${GO_BUILD_NAME}
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: always
+    - when: never
 
 # Build container
 build-docker:
@@ -197,6 +201,8 @@ build-docker:
   variables:
     FF_KANIKO_OCI_STAGES: 'true'
   dependencies:
+    - go_build
+  needs:
     - go_build
   before_script: []
   script:
@@ -221,3 +227,7 @@ build-docker:
       --context="$CI_PROJECT_DIR"
       --dockerfile="$CI_PROJECT_DIR/Dockerfile"
       --destination="$CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: always
+    - when: never
