@@ -36,7 +36,7 @@ stages:
 
 # Download dependencies
 go_mod_download:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: prepare
   script:
     - mkdir -p $GOPATH
@@ -56,7 +56,7 @@ go_mod_download:
 
 # Lint code
 go_lint:
-  image: golangci/golangci-lint:v2.6.1-alpine
+  image: golangci/golangci-lint:v2.6.1-alpine@sha256:a7da5151e0bd61bd7f99e1ebd8e5e144b535b73b2762c498443ff4f6a4a538c4
   stage: go-test
   needs: [ ]
   rules:
@@ -81,7 +81,7 @@ go_lint:
 
 # Unit tests with coverage
 go_test:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: go-test
   needs:
     - job: go_mod_download
@@ -119,7 +119,7 @@ go_test:
 
 # Race condition tests
 go_test_race:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: go-test
   needs:
     - job: go_mod_download
@@ -135,7 +135,7 @@ go_test_race:
 
 # Check if go mod tidy produces any changes
 go_mod_tidy:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: go-test
   needs:
     - job: go_mod_download
@@ -154,7 +154,7 @@ go_mod_tidy:
 
 # Job to check for available updates for any direct module dependencies.
 go_mod_updates:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: go-test
   needs:
     - job: go_mod_download
@@ -177,7 +177,7 @@ go_mod_updates:
 
 # Build for current OS/arch
 go_build:
-  image: golang:1.25.3
+  image: golang:1.25.3@sha256:6d4e5e74f47db00f7f24da5f53c1b4198ae46862a47395e30477365458347bf2
   stage: build-app
   script:
     - export CGO_ENABLED=0
@@ -196,7 +196,7 @@ go_build:
 build-docker:
   stage: build-container
   image:
-    name: martizih/kaniko:v1.26.1-debug
+    name: martizih/kaniko:v1.26.1-debug@sha256:6a01e35fc43218b104cebaa63e1a41c811db7c69a5dcf37b80537ff41a2d08de
     entrypoint: [""]
   variables:
     FF_KANIKO_OCI_STAGES: 'true'
