@@ -327,15 +327,12 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	authLog.Debug("logging user out of qnap api...")
 	if qlErr := qnapLogout(ctx, authLog, client, QnapURL, sid); qlErr != nil {
 		authLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
-	} else {
-		authLog.Info("destroyed login session for user in qnap api")
 	}
 
 	// Build virtual folders and permissions
 	folders, virtualFolders := buildVirtualFolders(authLog, shares)
 
 	// Initiate sftpgo virtual folder sync
-	authLog.WithField("folders", folders).Trace("all folders")
 	failedFolders, err := sftpgoSyncFolders(authLog, folders)
 	if err != nil {
 		authLog.WithError(err).Error("failed to sync folders, denying login")
@@ -344,7 +341,6 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 		return sftpgoResponse{}, err
 	}
 	filterInvalidFolders(&virtualFolders, failedFolders)
-	authLog.Info("sftpgo virtual folders synced")
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
@@ -374,13 +370,11 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	}
 
 	// Set UID/GID if possible
-	if checkPasswdFileExistence() {
-		userInfo, passwdErr := getPasswdFileUser(req.Username)
-		if passwdErr == nil {
-			authLog.WithField("uid", userInfo.UID).WithField("gid", userInfo.GID).Debug("setting UID/GID for user")
-			resp.UID = userInfo.UID
-			resp.GID = userInfo.GID
-		}
+	userInfo, passwdErr := getPasswdFileUser(req.Username)
+	if passwdErr == nil {
+		authLog.WithField("uid", userInfo.UID).WithField("gid", userInfo.GID).Debug("setting UID/GID for user")
+		resp.UID = userInfo.UID
+		resp.GID = userInfo.GID
 	}
 
 	return resp, nil
@@ -496,6 +490,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 		}).Debug("added qnap share to array")
 	}
 
+	authLog.WithField("folders", folders).Trace("all folders")
 	return folders, virtualFolders
 }
 

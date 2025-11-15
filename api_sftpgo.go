@@ -113,6 +113,7 @@ func sftpgoSyncFolders(authLog *log.Entry, desiredFolders []sftpgoBackendFolder)
 			Error("failed to logout of sftpgo, proceeding")
 	}
 
+	authLog.Info("sftpgo virtual folders synced")
 	return failedFolders, nil
 }
 

@@ -59,6 +59,7 @@ var (
 	// AuthGwHTTPS defines if it's running in HTTPS mode or not'
 	AuthGwHTTPS bool
 	// QnapPasswdFile is the path to the passwd file (usually within the container)
+	//nolint:gosec // false-positive of G101 for hardcoded credentials
 	QnapPasswdFile = "/qnap_passwd"
 
 	// QnapURL defines the full URL to use for QNAP API calls

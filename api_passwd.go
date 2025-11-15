@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -58,10 +59,18 @@ func getPasswdFileAllUsers() ([]passwdUser, error) {
 			log.WithError(uidInt).Error("failed to parse qnap passwd: uid invalid, skipping")
 			continue
 		}
+		if uid < 0 || uid > math.MaxInt32 {
+			log.Error("failed to parse qnap passwd: uid out of int32 range, skipping")
+			continue
+		}
 
 		gid, gidInt := strconv.Atoi(line[3])
 		if gidInt != nil {
 			log.WithError(gidInt).Error("failed to parse qnap passwd: gid invalid, skipping")
+			continue
+		}
+		if gid < 0 || gid > math.MaxInt32 {
+			log.Error("failed to parse qnap passwd: gid out of int32 range, skipping")
 			continue
 		}
 
