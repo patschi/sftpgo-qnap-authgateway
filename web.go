@@ -373,6 +373,16 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 		Permissions:    perms,
 	}
 
+	// Set UID/GID if possible
+	if checkPasswdFileExistence() {
+		userInfo, passwdErr := getPasswdFileUser(req.Username)
+		if passwdErr == nil {
+			authLog.WithField("uid", userInfo.UID).WithField("gid", userInfo.GID).Debug("setting UID/GID for user")
+			resp.UID = userInfo.UID
+			resp.GID = userInfo.GID
+		}
+	}
+
 	return resp, nil
 }
 

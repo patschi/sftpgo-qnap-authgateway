@@ -58,6 +58,8 @@ var (
 
 	// AuthGwHTTPS defines if it's running in HTTPS mode or not'
 	AuthGwHTTPS bool
+	// QnapPasswdFile is the path to the passwd file (usually within the container)
+	QnapPasswdFile = "/qnap_passwd"
 
 	// QnapURL defines the full URL to use for QNAP API calls
 	// (example: https://10.0.0.100)
@@ -215,6 +217,14 @@ func loadSettings() {
 
 	// --- Auth Gateway Configuration ---
 	AuthGwHTTPS = parseBoolEnv("AUTHGW_HTTPS", false)
+
+	QnapPasswdFile = getEnv("QNAP_PASSWD_FILE", "/qnap_passwd")
+
+	if checkPasswdFileExistence() {
+		log.Info("QNAP passwd file detected: it will be used to gather user's UID/GID information")
+	} else {
+		log.Warn("QNAP passwd file not detected: it will NOT be used to gather user's UID/GID user information")
+	}
 }
 
 // setupLogger is initializing the logger and setting up the log level.
