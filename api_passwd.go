@@ -90,8 +90,8 @@ func getPasswdFileAllUsers() ([]passwdUser, error) {
 		// Add user to the list
 		users = append(users, passwdUser{
 			Username: username,
-			UID:      int32(uid),
-			GID:      int32(gid),
+			UID:      int32(uid), //nolint:gosec // integer overflow not possible due to checks above
+			GID:      int32(gid), //nolint:gosec // integer overflow not possible due to checks above
 			HomeDir:  homeDir,
 		})
 	}

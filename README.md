@@ -11,12 +11,54 @@ Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on
 
 The procedure is as follows:
 
-1) Users can log in to QNAP using e.g. SFTP to sftpgo service, run in a container.
-2) sftpgo makes a HTTP call to the auth gateway to validate authentication. 
+1) Users can log in to QNAP using SFTP (or any other protocol sftpgo provides) to sftpgo service, run in a container.
+2) sftpgo makes an HTTP call to the auth gateway to validate authentication. 
 3) The auth gateway uses the same user credentials provided to perform a login to QNAP API to check for credentials.
 4) If authentication is successful, it retrieves all shared folders the user has permissions to.
-5) Then, the auth gateway provides sftpgo a response to allow login or deny access. 
-6) sftpgo then gets the response and, if successful, provides access to the QNAP shared folders the user has access to.
+5) If `/qnap_passwd` is mounted in container, it will be used to map user/group IDs to usernames for proper permissions.
+6) Then, the auth gateway provides sftpgo a response to allow login or deny access. 
+7) sftpgo then gets the response and, if successful, provides access to the QNAP shared folders the user has access to.
+
+### Diagram
+
+```text
+ ┌───────────────────────────┐
+ │        SFTP Client        │
+ │ (User connects to SFTPGO) │
+ └─────────────┬─────────────┘
+               │                       
+               │ 1) User login attempt 
+               │
+ ┌─────────────▼───────────┐                         ┌──────────────────────────┐
+ │          SFTPGO         │─────────────────────────│       Auth Gateway       │
+ │  Containerized service  │  2) HTTP auth request   | (HTTP endpoint for auth) │
+ └──────────────┬──────────┘                         └─────────────┬────────────┘
+                │                                                  │ 3) Gateway logs in to QNAP API
+                │                                                  │     with same credentials
+                │                                     ┌────────────▼─────────────┐
+                │                                     │         QNAP API         │
+                │                                     │ Validates credentials    │
+                │                                     │ Returns permitted shares │
+                │                                     └────────────┬─────────────┘
+                │                                                  | 4) Return folders
+                │<─────────────────────────────────────────────────┘
+                │       5) If /qnap_passwd mounted:
+                │          → Map username → UID/GID
+                │
+                │<───────────────────────────
+                │ 6) Auth result (allow/deny)
+                │
+  ┌─────────────▼────────────┐
+  │          SFTPGO          │
+  │  Grants / denies access  │
+  └─────────────┬────────────┘
+                │
+                │ 7) If allowed, expose QNAP shares
+      ┌─────────▼─────────┐
+      │ User gets access  │
+      │ to shared folders │
+      └───────────────────┘
+```
 
 ### Features
 
@@ -47,8 +89,8 @@ The procedure is as follows:
 - Point SFTPGo external auth to the service endpoint:
     - `external_auth_hook=https://sftpgo-qnap-authgw/auth`
     - `external_auth_scope=5` (only password and keyboard-interactive; any other is unsupported)
-- Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent 
-  this auth gateway from being blocked, instead of the user)
+- Disable the auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it.
+  (To prevent the auth gateway from being blocked, instead of the user)
 - If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable 
   REST API on SFTPGo and provide the below environment variable.
 
@@ -57,8 +99,7 @@ The procedure is as follows:
 ### Setup sftpgo service account (optional)
 
 If you want to enable automated virtual folder managed, this service needs a user account with proper permissions during
-the login.
-The user can either be created manually, or via API. As can be seen for API calls below.
+the login. The user can either be created manually, or via API. As can be seen for API calls below.
 
 **Note**: Please replace URLs, username, and password accordingly.
 
