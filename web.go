@@ -148,7 +148,12 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// check for supported authentication methods
 	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TLSCert != "" {
-		authLog.Warn("unsupported authentication method")
+		authLog.WithFields(log.Fields{
+			"password":             len(req.Password.String()),
+			"public_key":           req.PublicKey,
+			"keyboard_interactive": req.KeyboardInteractive,
+			"tls_cert":             req.TLSCert,
+		}).Warn("unsupported authentication method")
 		writeDeny(w, http.StatusBadRequest, "unsupported_method", "unsupported authentication method")
 		return
 	}
@@ -450,11 +455,14 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 			vfPerms = SharePermsReadOnly
 		}
 
+		// Parse description
+		folderDesc := strings.ReplaceAll(SftpgoManagedFolderDesc, "{name}", s.Text)
+
 		// adding sftpgo folder
 		folder := sftpgoBackendFolder{
 			Name:        name,
 			MappedPath:  qnapPath,
-			Description: fmt.Sprintf(SftpgoManagedFolderDesc, s.Text),
+			Description: folderDesc,
 			Filesystem: &sftpgoFolderFilesystem{
 				Provider: 0,
 			},
@@ -475,7 +483,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 			"sftpgo_path": sftpgoPath,
 			"qnap_path":   qnapPath,
 			"perms":       vfPerms,
-		}).Debug("added qnap share")
+		}).Debug("added qnap share to array")
 	}
 
 	return folders, virtualFolders
