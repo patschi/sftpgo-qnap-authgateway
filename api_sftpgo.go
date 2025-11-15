@@ -68,6 +68,7 @@ func sftpgoSyncFolders(authLog *log.Entry, desiredFolders []sftpgoBackendFolder)
 		authLog.WithError(err).Error("failed to create cookie jar")
 		return []string{}, err
 	}
+
 	//nolint:gosec,exhaustruct // intentional: user decides to ignore, defaults acceptable
 	client := &http.Client{
 		Jar:     jar,
@@ -97,7 +98,7 @@ func sftpgoSyncFolders(authLog *log.Entry, desiredFolders []sftpgoBackendFolder)
 	// If it does, we check for differences and update it if necessary.
 	for _, desiredFolder := range desiredFolders {
 		name := desiredFolder.Name
-		authLog.WithField("folder", name).Debug("checking folder")
+		authLog.WithField("folder", name).Trace("checking folder")
 		apiErr := sftpgoProcessFolder(ctx, authLog, client, token, desiredFolder)
 		if apiErr != nil {
 			authLog.WithField("folder", name).WithError(apiErr).
@@ -220,7 +221,7 @@ func sftpgoLogout(ctx context.Context, authLog *log.Entry, client *http.Client, 
 		return resp.StatusCode, fmt.Errorf("logout failed: %s", string(body))
 	}
 
-	authLog.Info("sftpgo logout completed")
+	authLog.Debug("sftpgo logout completed")
 	return resp.StatusCode, nil
 }
 
@@ -254,7 +255,7 @@ func sftpgoCreateFolder(ctx context.Context, authLog *log.Entry, client *http.Cl
 		return fmt.Errorf("create folder failed: %s", string(body))
 	}
 
-	authLog.WithField("name", folder.Name).Info("folder created successfully")
+	authLog.WithField("name", folder.Name).Info("sftpgo folder created successfully")
 	return nil
 }
 

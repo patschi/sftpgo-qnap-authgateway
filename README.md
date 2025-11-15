@@ -4,6 +4,9 @@ Tiny HTTP gateway that lets SFTPGo authenticate users transparently against a QN
 accessible shares as virtual folders in sftpgo. This provides the long-overdue missing feature of a SFTP server 
 in today's QNAP NAS'es.
 
+Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on 
+[QNAP's Container Station](https://www.qnap.com/en-us/products/container_station.html).
+
 ## How it works
 
 The procedure is as follows:
@@ -21,6 +24,9 @@ The procedure is as follows:
 - Builds SFTPGo virtual folders from QNAP shares.
 - If `SFTPGO_FOLDER_SYNC` is enabled, it syncs virtual folders from QNAP to sftpgo on each successful login.
 - Certificate validation for both QNAP and SFTPGo can be disabled, if needed.
+- If file `/etc/passwd` from QNAP NAS is mounted to `/qnap_passwd` within the container, it will be used to map user
+  and group IDs to usernames to handle permissions properly. Unfortunately, QNAP API does not provide this 
+  information. Even when the name suggests otherwise, this file does not contain any passwords nor its hashes.
 
 ## Roadmap
 
@@ -131,9 +137,10 @@ services:
       - authgw
     networks:
       sftp_net:
-        ipv4_address: 172.22.10.10
+        ipv4_address: 172.22.99.10
     volumes:
       - sftpgo_config:/var/lib/sftpgo:rw
+      - /etc/passwd:/qnap_passwd:ro
       - /share:/share:rw
     ports:
       - "9080:8080" # Web UI on host
@@ -150,13 +157,13 @@ services:
     restart: unless-stopped
     networks:
       sftp_net:
-        ipv4_address: 172.22.10.20
+        ipv4_address: 172.22.99.20
     expose:
       - "9999" # Only accessible inside sftp_net
     environment:
       LOG_LEVEL: "trace"
       QNAP_CHECK_CERT: "false"
-      QNAP_URL: "https://172.22.10.1"
+      QNAP_URL: "https://172.22.99.1"
       SFTPGO_API_URL: "http://sftpgo:8080/"
       SFTPGO_API_USER: "admin"
       SFTPGO_API_PASS: "admin"
@@ -166,7 +173,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.22.10.0/24
+        - subnet: 172.22.99.0/24
 
 volumes:
   sftpgo_config:

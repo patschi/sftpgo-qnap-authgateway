@@ -324,11 +324,11 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	authLog.WithField("count", len(shares)).Info("accessible shares retrieved")
 
 	// Logout user from QNAP
-	authLog.Debug("logging user out of QNAP API...")
+	authLog.Debug("logging user out of qnap api...")
 	if qlErr := qnapLogout(ctx, authLog, client, QnapURL, sid); qlErr != nil {
 		authLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
 	} else {
-		authLog.Info("destroyed login session for user in QNAP API")
+		authLog.Info("destroyed login session for user in qnap api")
 	}
 
 	// Build virtual folders and permissions
@@ -357,7 +357,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	perms := make(map[string][]string, len(virtualFolders)+1)
 	// Default permission to the root folder by default
 	perms["/"] = SharePermsListOnly
-
+	// Set permissions for all other folders
 	for i := range virtualFolders {
 		perms[virtualFolders[i].VirtualPath] = virtualFolders[i].Permission
 	}

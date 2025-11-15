@@ -66,7 +66,7 @@ func qnapLogin(ctx context.Context, authLog *log.Entry, client *http.Client,
 		return "", err
 	}
 
-	authLog.Debug("calling qnap auth endpoint")
+	authLog.Trace("calling qnap auth endpoint")
 	defer WipeBuffer(&buf) // wipe buffer from memory
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, loginURL, bytes.NewReader(buf.Bytes()))
 	if err != nil {
@@ -121,7 +121,7 @@ func qnapLogin(ctx context.Context, authLog *log.Entry, client *http.Client,
 // It takes a context and HTTP client as parameters.
 // Returns an error in case of failure.
 func qnapLogout(ctx context.Context, authLog *log.Entry, client *http.Client, baseURL string, sid string) error {
-	authLog.WithField("sid", sid).Trace("destroying session on QNAP API")
+	authLog.WithField("sid", sid).Trace("destroying session on qnap api")
 
 	logoutURL := fmt.Sprintf("%s/cgi-bin/authLogout.cgi", baseURL)
 
@@ -149,7 +149,7 @@ func qnapLogout(ctx context.Context, authLog *log.Entry, client *http.Client, ba
 		return fmt.Errorf("logout failed HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
-	authLog.WithField("sid", sid).Trace("user session destroyed on QNAP API")
+	authLog.WithField("sid", sid).Trace("user session destroyed on qnap api")
 	return nil
 }
 
