@@ -1,21 +1,32 @@
 # sftpgo-qnap-authgateway
 
-Tiny HTTP gateway that lets SFTPGo authenticate users against a QNAP NAS and auto‑map their accessible shares as virtual
-folders. Fast, stateless, and logs every request with a request ID.
+Tiny HTTP gateway that lets SFTPGo authenticate users transparently against a QNAP NAS and auto‑map their 
+accessible shares as virtual folders in sftpgo. This provides the long-overdue missing feature of a SFTP server 
+in today's QNAP NAS'es.
 
-## Features
+## How it works
 
-- Authenticates via QNAP API
-- Builds SFTPGo virtual folders from QNAP shares
-- Per‑request cookies, strict timeouts, structured logging
-- Simple JSON API for SFTPGo external auth
-- Optional TLS cert verification for QNAP API
+The procedure is as follows:
+
+1) Users can log in to QNAP using e.g. SFTP to sftpgo service, run in a container.
+2) sftpgo makes a HTTP call to the auth gateway to validate authentication. 
+3) The auth gateway uses the same user credentials provided to perform a login to QNAP API to check for credentials.
+4) If authentication is successful, it retrieves all shared folders the user has permissions to.
+5) Then, the auth gateway provides sftpgo a response to allow login or deny access. 
+6) sftpgo then gets the response and, if successful, provides access to the QNAP shared folders the user has access to.
+
+### Features
+
+- Authenticates via QNAP API.
+- Builds SFTPGo virtual folders from QNAP shares.
+- If `SFTPGO_FOLDER_SYNC` is enabled, it syncs virtual folders from QNAP to sftpgo on each successful login.
+- Certificate validation for both QNAP and SFTPGo can be disabled, if needed.
 
 ## Roadmap
 
 - Implement HTTPS webserver support
 - Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
-- Implement some basic caching for sftpgo virtual sync folders for performance (e.g. update only every 5s)
+- Implement some basic caching for sftpgo virtual sync folders for performance (e.g., update only every 5s)
 
 ## Requirements
 
@@ -30,10 +41,10 @@ folders. Fast, stateless, and logs every request with a request ID.
 - Point SFTPGo external auth to the service endpoint:
     - `external_auth_hook=https://sftpgo-qnap-authgw/auth`
     - `external_auth_scope=5` (only password and keyboard-interactive; any other is unsupported)
-- Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent this
-  auth gateway from being blocked, instead of the user)
-- If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable REST
-  API on SFTPGo and provide the below environment variable.
+- Disable auto-ban on invalid logins on QNAP for this service and configure sftpgo to take care of it. (To prevent 
+  this auth gateway from being blocked, instead of the user)
+- If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable 
+  REST API on SFTPGo and provide the below environment variable.
 
 ## Configuration
 
@@ -103,6 +114,63 @@ curl -X GET "${GW_URL}/api/v2/logout" \
 | `SFTPGO_HOMEDIR`            | `/var/tmp`                                                 | sftpgo requires this, empty folder is OK; "{user}" is replaced to username |
 | `AUTHGW_TLS`                | `false`                                                    | Enable TLS and HTTPS \(not implemented yet\)                               |
 | `LOG_LEVEL`                 | `info`                                                     | Log level \(allowed: trace\|debug\|info\|warn\|error\)                     |
+
+### `compose.yml` example
+
+**Note**: This contains very basic passwords and should not be used in production. Change them.
+
+Use `Container Station - Applications - Create` and use below example compose configuration as a quick start.
+
+```yaml
+services:
+  sftpgo:
+    image: drakkan/sftpgo:v2.7-distroless-slim
+    container_name: sftpgo
+    restart: unless-stopped
+    depends_on:
+      - authgw
+    networks:
+      sftp_net:
+        ipv4_address: 172.22.10.10
+    volumes:
+      - sftpgo_config:/var/lib/sftpgo:rw
+      - /share:/share:rw
+    ports:
+      - "9080:8080" # Web UI on host
+      - "9022:2022" # SFTP/SSH on host
+    environment:
+      SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
+      SFTPGO_DATA_PROVIDER__EXTERNAL_AUTH_HOOK: "http://authgw:9999/auth"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: "admin"
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: "admin"
+
+  authgw:
+    image: <image>/sftpgo-qnap-authgateway:latest
+    container_name: authgw
+    restart: unless-stopped
+    networks:
+      sftp_net:
+        ipv4_address: 172.22.10.20
+    expose:
+      - "9999" # Only accessible inside sftp_net
+    environment:
+      LOG_LEVEL: "trace"
+      QNAP_CHECK_CERT: "false"
+      QNAP_URL: "https://172.22.10.1"
+      SFTPGO_API_URL: "http://sftpgo:8080/"
+      SFTPGO_API_USER: "admin"
+      SFTPGO_API_PASS: "admin"
+
+networks:
+  sftp_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.10.0/24
+
+volumes:
+  sftpgo_config:
+```
 
 ## Notes
 
