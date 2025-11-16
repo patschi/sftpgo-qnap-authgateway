@@ -1,8 +1,10 @@
 # sftpgo-qnap-authgateway
 
-Tiny HTTP gateway that lets SFTPGo authenticate users transparently against a QNAP NAS and auto‑map their 
-accessible shares as virtual folders in sftpgo. This provides the long-overdue missing feature of a SFTP server 
-in today's QNAP NAS'es.
+Tiny HTTP gateway that lets SFTPGo authenticate users transparently against a QNAP NAS and auto‑map all shares
+with granted permission as virtual folders in sftpgo. Running entirely with Container Station on QNAP NAS.
+
+This provides the long-overdue missing feature of a SFTP server in today's QNAP NAS'es in the most-transparent
+way possible with central user and permission management remaining in QNAP UI.
 
 Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on 
 [QNAP's Container Station](https://www.qnap.com/en-us/products/container_station.html).
@@ -19,29 +21,52 @@ The procedure is as follows:
 6) Then, the auth gateway provides sftpgo a response to allow login or deny access. 
 7) sftpgo then gets the response and, if successful, provides access to the QNAP shared folders the user has access to.
 
+### SFTP Client Example
+
+```shell
+# sftp -o StrictHostKeyChecking=no -P 9022 test@192.168.0.10
+test@192.168.0.10's password:
+Connected to 192.168.0.10.
+sftp> ls -l
+drwxr-xr-x    1 0        0               0 Jan 1  1970 Public
+drwxr-xr-x    1 0        0               0 Jan 1  1970 Test
+sftp>
+sftp> cd Test/
+sftp> ls -l
+sftp> put test.txt
+Uploading test.txt to /Test/test.txt
+test.txt                       100%    0     0.0KB/s   00:00
+sftp> ls -l
+-rwxrwxrwx    1 1004     100         0 Nov 16 01:32 test.txt
+```
+
 ### Diagram
 
 ```text
  ┌───────────────────────────┐
  │        SFTP Client        │
  │ (User connects to SFTPGO) │
- └─────────────┬─────────────┘
-               │                       
-               │ 1) User login attempt 
-               │
- ┌─────────────▼───────────┐                         ┌──────────────────────────┐
- │          SFTPGO         │─────────────────────────│       Auth Gateway       │
- │  Containerized service  │  2) HTTP auth request   | (HTTP endpoint for auth) │
- └──────────────┬──────────┘                         └─────────────┬────────────┘
-                │                                                  │ 3) Gateway logs in to QNAP API
-                │                                                  │     with same credentials
-                │                                     ┌────────────▼─────────────┐
-                │                                     │         QNAP API         │
-                │                                     │ Validates credentials    │
-                │                                     │ Returns permitted shares │
-                │                                     └────────────┬─────────────┘
-                │                                                  | 4) Return folders
-                │<─────────────────────────────────────────────────┘
+ └──────────────┬────────────┘
+                │                       
+                │ 1) User login attempt 
+                │
+   ┌────────────▼────────────┐                      ┌──────────────────────────┐
+   │          SFTPGO         │──────────────────────│       Auth Gateway       │
+   │  Containerized service  │ 2) HTTP auth request | (HTTP endpoint for auth) │
+   └────────────┬────────────┘                      └───────────┬──────────────┘
+                │                                               │
+                │                                               │ 3) Gateway logs in to QNAP API
+                │                                               │     with same credentials
+                │                                               │
+                │                                  ┌────────────▼─────────────┐
+                │                                  │         QNAP API         │
+                │                                  │ Validates credentials    │
+                │                                  │ Returns permitted shares │
+                │                                  └────────────┬─────────────┘
+                │                                               │
+                │                                               │ 4) Return folders
+                │                                               │
+                │<──────────────────────────────────────────────┘
                 │       5) If /qnap_passwd mounted:
                 │          → Map username → UID/GID
                 │
@@ -54,6 +79,7 @@ The procedure is as follows:
   └─────────────┬────────────┘
                 │
                 │ 7) If allowed, expose QNAP shares
+                │
       ┌─────────▼─────────┐
       │ User gets access  │
       │ to shared folders │
@@ -68,7 +94,7 @@ The procedure is as follows:
 - Certificate validation for both QNAP and SFTPGo can be disabled, if needed.
 - If file `/etc/passwd` from QNAP NAS is mounted to `/qnap_passwd` within the container, it will be used to map user
   and group IDs to usernames to handle permissions properly. Unfortunately, QNAP API does not provide this 
-  information. Even when the name suggests otherwise, this file does not contain any passwords nor its hashes.
+  information. Even when the name suggests otherwise, this file does not contain any passwords nor hashes.
 
 ## Roadmap
 
@@ -98,8 +124,8 @@ The procedure is as follows:
 
 ### Setup sftpgo service account (optional)
 
-If you want to enable automated virtual folder managed, this service needs a user account with proper permissions during
-the login. The user can either be created manually, or via API. As can be seen for API calls below.
+If you want to enable automated virtual folder managed, this service needs a user account with proper permissions 
+during the login. The user can either be created manually, or via API. As can be seen for the API calls below.
 
 **Note**: Please replace URLs, username, and password accordingly.
 
@@ -174,23 +200,23 @@ services:
     image: drakkan/sftpgo:v2.7-distroless-slim
     container_name: sftpgo
     restart: unless-stopped
+    user: "0:100" # needed to change permissions to logged-in user (UID 0 = root, GID 100 = everyone)
     depends_on:
       - authgw
     networks:
       sftp_net:
         ipv4_address: 172.22.99.10
     volumes:
-      - sftpgo_config:/var/lib/sftpgo:rw
-      - /etc/passwd:/qnap_passwd:ro
-      - /share:/share:rw
+      - sftpgo_config:/var/lib/sftpgo:rw # where sftpgo config is persisted
+      - /share:/share:rw # where all QNAP shares are located
     ports:
       - "9080:8080" # Web UI on host
       - "9022:2022" # SFTP/SSH on host
     environment:
       SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN: "true"
       SFTPGO_DATA_PROVIDER__EXTERNAL_AUTH_HOOK: "http://authgw:9999/auth"
-      SFTPGO_DEFAULT_ADMIN_USERNAME: "admin"
-      SFTPGO_DEFAULT_ADMIN_PASSWORD: "admin"
+      SFTPGO_DEFAULT_ADMIN_USERNAME: "admin" # only used on the first startup of sftpgo
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: "admin" # Change them afterward via sftpgo Web UI!
 
   authgw:
     image: <image>/sftpgo-qnap-authgateway:latest
@@ -199,22 +225,24 @@ services:
     networks:
       sftp_net:
         ipv4_address: 172.22.99.20
+    volumes:
+      - /etc/passwd:/qnap_passwd:ro # read-only needed to get UID/GID from a logged-in user
     expose:
-      - "9999" # Only accessible inside sftp_net
+      - "9999" # only accessible inside sftp_net, so only from QNAP NAS and sftpgo container
     environment:
-      LOG_LEVEL: "trace"
+      LOG_LEVEL: "debug" # 'trace' not recommended due to high verbosity
       QNAP_CHECK_CERT: "false"
-      QNAP_URL: "https://172.22.99.1"
+      QNAP_URL: "https://172.22.99.1" # .1 points to the gateway, which should be QNAP NAS itself
       SFTPGO_API_URL: "http://sftpgo:8080/"
-      SFTPGO_API_USER: "admin"
-      SFTPGO_API_PASS: "admin"
+      SFTPGO_API_USER: "admin" # needed if SFTPGO_FOLDER_SYNC enabled, use a dedicated service account for security
+      SFTPGO_API_PASS: "admin" # use highly secure password here
 
 networks:
   sftp_net:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.22.99.0/24
+        - subnet: 172.22.99.0/24 # make sure this subnet is not in use on QNAP NAS
 
 volumes:
   sftpgo_config:
@@ -222,6 +250,17 @@ volumes:
 
 ## Notes
 
-- QNAP API calls time out after 10s.
-- Sessions are logged out after shares are fetched.
+- QNAP and sftpgo API calls time out after 10 seconds.
+- Sessions to QNAP and sftpgo are explicitly logged out after use.
+- If `/qnap_passwd` is not mounted, permissions will be set to user/group the sftpgo container is running under.
+- Virtual folder sync requires sftpgo REST API to be enabled and a service account with `manage_folders` permission.
 - User entries for sftpgo expire 5 minutes after issuance.
+
+## FAQ
+
+### sftpgo logs show "Operation not permitted" (when changing permissions) for any files.
+
+**Answer**: This occurs when sftpgo is not running as root, and hence is not able to change permissions properly.
+Also, this can be observed when running `chown 1000:100 test.txt` as any non-root user.
+
+**Solution**: Set `user` to `0:100` in `docker-compose.yml` to run sftpgo as `root` with group `everybody`.

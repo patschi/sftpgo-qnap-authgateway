@@ -49,3 +49,18 @@ curl -X GET --url http://127.0.0.1:8080/api/v2/logout -H 'Accept: application/js
 ```shell
 curl -X POST http://localhost:9999/auth -H "Content-Type: application/json" -d '{"username": "test", "password": "Password_123", "ip": "10.0.0.1", "protocol": "ssh" }' | jq .
 ```
+
+## sftp client
+
+1. Transfer test file
+
+```shell
+echo -e "cd Test/\nls -l\nput test.txt\nls -l" | sshpass -p "Password_123" sftp -o StrictHostKeyChecking=no -P 9022 test@192.168.0.10
+Connected to 192.168.0.10.
+sftp> cd Test/
+sftp> ls -l
+sftp> put test.txt
+Uploading test.txt to /Test/test.txt
+sftp> ls -l
+-rwxrwxrwx    1 1004     100             0 Nov 16 01:14 test.txt
+```
