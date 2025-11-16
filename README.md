@@ -9,6 +9,22 @@ way possible with central user and permission management remaining in QNAP UI.
 Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on 
 [QNAP's Container Station](https://www.qnap.com/en-us/products/container_station.html).
 
+### Features
+
+- Authenticates via QNAP API to verify user-provided credentials.
+- Builds SFTPGo virtual folders from QNAP shares the user has access to.
+- Certificate validation for both QNAP and SFTPGo can be disabled, if needed.
+- If `SFTPGO_FOLDER_SYNC` is enabled and sftpgo credentials are provided, it syncs virtual folders from
+  QNAP to sftpgo during each successful login.
+- If file `/etc/passwd` from QNAP NAS is mounted to `/qnap_passwd` within the container, it will be used to map user
+  and group IDs to usernames to handle permissions properly. Unfortunately, QNAP API does not provide this
+  information. Even when the name suggests otherwise, this file does not contain any passwords nor hashes.
+
+## Requirements
+
+- QNAP NAS (tested QuTS hero 5.2.7.3297) with installed Container Station
+- SFTPGo (tested 2.7.0)
+
 ## How it works
 
 The procedure is as follows:
@@ -23,7 +39,7 @@ The procedure is as follows:
 
 ### SFTP Client Example
 
-```shell
+```text
 # sftp -o StrictHostKeyChecking=no -P 9022 test@192.168.0.10
 test@192.168.0.10's password:
 Connected to 192.168.0.10.
@@ -86,28 +102,7 @@ sftp> ls -l
       └───────────────────┘
 ```
 
-### Features
-
-- Authenticates via QNAP API.
-- Builds SFTPGo virtual folders from QNAP shares.
-- If `SFTPGO_FOLDER_SYNC` is enabled, it syncs virtual folders from QNAP to sftpgo on each successful login.
-- Certificate validation for both QNAP and SFTPGo can be disabled, if needed.
-- If file `/etc/passwd` from QNAP NAS is mounted to `/qnap_passwd` within the container, it will be used to map user
-  and group IDs to usernames to handle permissions properly. Unfortunately, QNAP API does not provide this 
-  information. Even when the name suggests otherwise, this file does not contain any passwords nor hashes.
-
-## Roadmap
-
-- Implement HTTPS webserver support
-- Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
-- Implement some basic caching for sftpgo virtual sync folders for performance (e.g., update only every 5s)
-
-## Requirements
-
-- QNAP NAS (tested QuTS hero 5.2.7.3297) with installed Container Station
-- SFTPGo (tested 2.7.0)
-
-## Quick start
+## Quick Start
 
 - Create a container on QNAP with this application.
     - Mount `/share` from QNAP to `/share` (or whatever is set in `QNAP_SHARE_PATH`) within the container.
@@ -119,6 +114,14 @@ sftp> ls -l
   (To prevent the auth gateway from being blocked, instead of the user)
 - If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable 
   REST API on SFTPGo and provide the below environment variable.
+
+## Roadmap/Ideas
+
+- Implement HTTPS webserver support
+- Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
+- Implement some basic caching for sftpgo virtual sync folders for performance (e.g., update only every 5s)
+- Implement some basic caching for passwd-file reading 
+  (e.g., read once at startup, update cache if user not found? modification date?)
 
 ## Configuration
 
@@ -219,7 +222,7 @@ services:
       SFTPGO_DEFAULT_ADMIN_PASSWORD: "admin" # Change them afterward via sftpgo Web UI!
 
   authgw:
-    image: <image>/sftpgo-qnap-authgateway:latest
+    image: ghcr.io/patschi/sftpgo-qnap-authgateway:latest
     container_name: authgw
     restart: unless-stopped
     networks:
