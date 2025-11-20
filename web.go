@@ -344,18 +344,17 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
-	userExpiry := time.Now().Add(SftpgoAccountExpirationTime).UnixMilli()
+	userExpiry := time.Now().Add(SftpgoAccountExpirationDuration).UnixMilli()
 
 	// Get home directory
 	homeDir := strings.ReplaceAll(SftpgoHomeDir, "{user}", req.Username)
 
 	// Build permissions map
-	perms := make(map[string][]string, len(virtualFolders)+1)
-	// Default permission to the root folder by default
-	perms["/"] = SharePermsListOnly
-	// Set permissions for all other folders
-	for i := range virtualFolders {
-		perms[virtualFolders[i].VirtualPath] = virtualFolders[i].Permission
+	perms := getPermissionMap(authLog, virtualFolders)
+
+	// Build filters map
+	filters := sftpgoUserFilters{
+		ExternalAuthCacheTime: int(SftpgoAuthCacheTimeDuration.Seconds()),
 	}
 
 	// Build response success
@@ -367,6 +366,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 		HomeDir:        homeDir,
 		VirtualFolders: virtualFolders,
 		Permissions:    perms,
+		Filters:        filters,
 	}
 
 	// Set UID/GID if possible
@@ -378,6 +378,23 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	}
 
 	return resp, nil
+}
+
+// getPermissionMap builds the permissions map for sftpgo based on the virtual folders.
+func getPermissionMap(authLog *log.Entry, virtualFolders []sftpgoVirtualFolder) map[string][]string {
+	// Allocate permissions map +1 for the root folder
+	perms := make(map[string][]string, len(virtualFolders)+1)
+
+	// Default permission to the root folder by default
+	perms["/"] = SharePermsListOnly
+
+	// Set permissions for all other folders
+	for i := range virtualFolders {
+		perms[virtualFolders[i].VirtualPath] = virtualFolders[i].Permission
+	}
+
+	authLog.WithField("permissions", perms).Trace("permissions map")
+	return perms
 }
 
 // filterInvalidFolders filters out any failed folders from virtualFolders.

@@ -92,8 +92,12 @@ var (
 
 	// SftpgoAccountExpiration is the duration for which the user account will be valid after successful login.
 	SftpgoAccountExpiration string
-	// SftpgoAccountExpirationTime is the parsed duration value of SftpgoAccountExpiration.
-	SftpgoAccountExpirationTime time.Duration
+	// SftpgoAccountExpirationDuration is the parsed duration value of SftpgoAccountExpiration.
+	SftpgoAccountExpirationDuration time.Duration
+	// SftpgoAuthCacheTime is the duration for how long sftpgo should cache the successful login
+	SftpgoAuthCacheTime string
+	// SftpgoAuthCacheTimeDuration is the parsed duration value of SftpgoAuthCacheTime.
+	SftpgoAuthCacheTimeDuration time.Duration
 
 	SharePermsDeny      []string
 	SharePermsListOnly  = []string{"list"}
@@ -196,12 +200,23 @@ func loadSettings() {
 	SftpgoVirtualFolderSync = parseBoolEnv("SFTPGO_FOLDER_SYNC", false)
 	SftpgoManagedFolderDesc = getEnv("SFTPGO_FOLDER_DESCRIPTION",
 		"QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway")
-	SftpgoAccountExpiration = getEnv("SFTPGO_ACCOUNT_EXPIRATION", "5m")
 
 	var parseErr error
-	SftpgoAccountExpirationTime, parseErr = time.ParseDuration(SftpgoAccountExpiration)
+	SftpgoAccountExpiration = getEnv("SFTPGO_ACCOUNT_EXPIRATION", "5m")
+	SftpgoAccountExpirationDuration, parseErr = time.ParseDuration(SftpgoAccountExpiration)
 	if parseErr != nil {
 		log.WithError(parseErr).Fatalf("invalid SFTPGO_ACCOUNT_EXPIRATION value: %q", SftpgoAccountExpiration)
+	}
+
+	SftpgoAuthCacheTime = getEnv("SFTPGO_AUTH_CACHE_TIME", SftpgoAccountExpiration)
+	SftpgoAuthCacheTimeDuration, parseErr = time.ParseDuration(SftpgoAuthCacheTime)
+	if parseErr != nil {
+		log.WithError(parseErr).Fatalf("invalid SFTPGO_AUTH_CACHE_TIME value: %q", SftpgoAuthCacheTime)
+	}
+
+	// Error when SftpgoAuthCacheTimeDuration is longer than SftpgoAccountExpirationDuration
+	if SftpgoAuthCacheTimeDuration > SftpgoAccountExpirationDuration {
+		log.Fatalf("SFTPGO_AUTH_CACHE_TIME cannot be longer than SFTPGO_ACCOUNT_EXPIRATION")
 	}
 
 	if SftpgoVirtualFolderSync && SftpgoAPIPass == "" {

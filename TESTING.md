@@ -7,7 +7,7 @@ Just rough notes used during and for testing.
 ### Spin up sftpgo:
 
 ```shell
-docker run --rm --name sftpgo -p 8080:8080 -p 2022:2022 -e SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true -e SFTPGO_DEFAULT_ADMIN_USERNAME=admin -e SFTPGO_DEFAULT_ADMIN_PASSWORD=admin -e SFTPGO_DATA_PROVIDER__EXTERNAL_AUTH_HOOK=http://host.docker.internal:9999/auth drakkan/sftpgo:latest
+docker run --rm --name sftpgo -p 8080:8080 -p 2022:2022 -e SFTPGO_LOG_LEVEL=debug -e SFTPGO_DATA_PROVIDER__CREATE_DEFAULT_ADMIN=true -e SFTPGO_DEFAULT_ADMIN_USERNAME=admin -e SFTPGO_DEFAULT_ADMIN_PASSWORD=admin -e SFTPGO_DATA_PROVIDER__EXTERNAL_AUTH_HOOK=http://host.docker.internal:9999/auth drakkan/sftpgo:latest
 ```
 
 ### Create user

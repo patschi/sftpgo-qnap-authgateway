@@ -49,8 +49,14 @@ type sftpgoResponse struct {
 	HomeDir        string                `json:"home_dir,omitempty"`
 	VirtualFolders []sftpgoVirtualFolder `json:"virtual_folders,omitempty"` // user-facing folders seen after login
 	Permissions    map[string][]string   `json:"permissions,omitempty"`     // permissions for each virtual folder
+	Filters        sftpgoUserFilters     `json:"filters,omitempty"`         // sftpgo filters for this user
 	Meta           map[string]string     `json:"meta,omitempty"`
 	Error          string                `json:"error,omitempty"`
+}
+
+// sftpgoUserFilters is the filters for a specific user for sftpgo.
+type sftpgoUserFilters struct {
+	ExternalAuthCacheTime int `json:"external_auth_cache_time,omitempty"`
 }
 
 // Main functions
