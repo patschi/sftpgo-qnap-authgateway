@@ -9,7 +9,7 @@ way possible with central user and permission management remaining in QNAP UI.
 Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on 
 [QNAP's Container Station](https://www.qnap.com/en-us/products/container_station.html).
 
-### Features
+# Features
 
 - Authenticates via QNAP API to verify user-provided credentials.
 - Builds SFTPGo virtual folders from QNAP shares the user has access to.
@@ -20,12 +20,15 @@ Designed to be used with [sftpgo](https://github.com/drakkan/sftpgo) and ran on
   and group IDs to usernames to handle permissions properly. Unfortunately, QNAP API does not provide this
   information. Even when the name suggests otherwise, this file does not contain any passwords nor hashes.
 
-## Requirements
+# Requirements
 
-- QNAP NAS (tested QuTS hero 5.2.7.3297) with installed Container Station
+- QNAP NAS (tested QuTS hero 5.2.7.3297) with:
+  - Container Station installed
+  - Respective users do need `Application Privilege` named `Application - File Station` 
+    which is required that the user can query its accessible shares via QNAP API
 - SFTPGo (tested 2.7.0)
 
-## How it works
+# How it works
 
 The procedure is as follows:
 
@@ -37,10 +40,10 @@ The procedure is as follows:
 6) Then, the auth gateway provides sftpgo a response to allow login or deny access. 
 7) sftpgo then gets the response and, if successful, provides access to the QNAP shared folders the user has access to.
 
-### SFTP Client Example
+## SFTP Client Example
 
 ```text
-# sftp -o StrictHostKeyChecking=no -P 9022 test@192.168.0.10
+# sftp -P 9022 test@192.168.0.10
 test@192.168.0.10's password:
 Connected to 192.168.0.10.
 sftp> ls -l
@@ -56,7 +59,7 @@ sftp> ls -l
 -rwxrwxrwx    1 1004     100         0 Nov 16 01:32 test.txt
 ```
 
-### Diagram
+## Diagram
 
 ```text
  ┌───────────────────────────┐
@@ -102,7 +105,7 @@ sftp> ls -l
       └───────────────────┘
 ```
 
-## Quick Start
+# Quick Start
 
 - Create a container on QNAP with this application.
     - Mount `/share` from QNAP to `/share` (or whatever is set in `QNAP_SHARE_PATH`) within the container.
@@ -115,7 +118,7 @@ sftp> ls -l
 - If you want to take advantage of automated virtual folders sync during successful user login, make sure to enable 
   REST API on SFTPGo and provide the below environment variable.
 
-## Roadmap/Ideas
+# Roadmap/Ideas
 
 - Implement HTTPS webserver support
 - Implement queue for sftpgo virtual sync based on virtual folders. Also add proper locking.
@@ -123,9 +126,9 @@ sftp> ls -l
 - Implement some basic caching for passwd-file reading 
   (e.g., read once at startup, update cache if user not found? modification date?)
 
-## Configuration
+# Configuration
 
-### Setup sftpgo service account (optional)
+## Setup sftpgo service account (optional)
 
 If you want to enable automated virtual folder managed, this service needs a user account with proper permissions 
 during the login. The user can either be created manually, or via API. As can be seen for the API calls below.
@@ -203,7 +206,7 @@ services:
     image: drakkan/sftpgo:v2.7-distroless-slim
     container_name: sftpgo
     restart: unless-stopped
-    user: "0:100" # needed to change permissions to logged-in user (UID 0 = root, GID 100 = everyone)
+    user: "0:100" # UID=0/root needed to change permissions to any logged-in user (GID100=everyone)
     depends_on:
       - authgw
     networks:
@@ -237,7 +240,7 @@ services:
       QNAP_CHECK_CERT: "false"
       QNAP_URL: "https://172.22.99.1" # .1 points to the gateway, which should be QNAP NAS itself
       SFTPGO_API_URL: "http://sftpgo:8080/"
-      SFTPGO_API_USER: "admin" # needed if SFTPGO_FOLDER_SYNC enabled, use a dedicated service account for security
+      SFTPGO_API_USER: "admin" # needed if SFTPGO_FOLDER_SYNC enabled, use a dedicated account
       SFTPGO_API_PASS: "admin" # use highly secure password here
 
 networks:
@@ -251,7 +254,7 @@ volumes:
   sftpgo_config:
 ```
 
-## Notes
+# Notes
 
 - QNAP and sftpgo API calls time out after 10 seconds.
 - Sessions to QNAP and sftpgo are explicitly logged out after use.
@@ -259,9 +262,9 @@ volumes:
 - Virtual folder sync requires sftpgo REST API to be enabled and a service account with `manage_folders` permission.
 - User entries for sftpgo expire 5 minutes after issuance.
 
-## FAQ
+# FAQ
 
-### sftpgo logs show "Operation not permitted" (when changing permissions) for any files.
+## sftpgo logs show "Operation not permitted" (when changing permissions) for any files.
 
 **Answer**: This occurs when sftpgo is not running as root, and hence is not able to change permissions properly.
 Also, this can be observed when running `chown 1000:100 test.txt` as any non-root user.
