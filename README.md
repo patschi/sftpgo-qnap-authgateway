@@ -178,22 +178,22 @@ curl -X GET "${GW_URL}/api/v2/logout" \
 
 ## Environment variables
 
-| Variable                    | Default                                                    | Description                                                                 |
-|-----------------------------|------------------------------------------------------------|-----------------------------------------------------------------------------|
-| `QNAP_URL`                  | `https://host.docker.internal`                             | Full URL, e.g. `https://10.0.0.100`                                         |
-| `QNAP_CHECK_CERT`           | `true`                                                     | Verify QNAP TLS cert; set to `false` to disable verification.               |
-| `QNAP_SHARE_PATH`           | `/share/{name}/`                                           | Absolute folder on QNAP where share is located at                           |
-| `SFTPGO_FOLDER_SYNC`        | `false`                                                    | Enable virtual folder sync upon successful login                            |
-| `SFTPGO_FOLDER_DESCRIPTION` | `QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway` | Use specific folder description in sftpgo during sync                       |
-| `SFTPGO_ACCOUNT_EXPIRATION` | `5m`                                                       | Set expiration time after of sftpgo user after successful login             |
-| `SFTPGO_AUTH_CACHE_TIME`    | by default same as `SFTPGO_ACCOUNT_EXPIRATION`             | Define time a login is cached by sftpgo. Default same as expiration. 0=off. |                                                     
-| `SFTPGO_API_URL`            | `http://host.docker.internal:8080`                         | API URL for sftpgo instance for virtual folder sync                         |
-| `SFTPGO_API_USER`           | `sa-qnap-authgw`                                           | sftpgo service account username; required for virtual folder sync           |
-| `SFTPGO_API_PASS`           | none                                                       | sftpgo service account password; required for virtual folder sync           |
-| `SFTPGO_CHECK_CERT`         | `true`                                                     | Verify sftpgo TLS cert; set to `false` to disable verification              |
-| `SFTPGO_HOMEDIR`            | `/var/tmp`                                                 | sftpgo requires this, empty folder is OK; "{user}" is replaced to username  |
-| `AUTHGW_TLS`                | `false`                                                    | Enable TLS and HTTPS \(not implemented yet\)                                |
-| `LOG_LEVEL`                 | `info`                                                     | Log level \(allowed: trace\|debug\|info\|warn\|error\)                      |
+| Variable                    | Default                                                    | Description                                                                   |
+|-----------------------------|------------------------------------------------------------|-------------------------------------------------------------------------------|
+| `QNAP_URL`                  | `https://host.docker.internal`                             | Full URL, e.g. `https://10.0.0.100`                                           |
+| `QNAP_CHECK_CERT`           | `true`                                                     | Verify QNAP TLS cert; set to `false` to disable verification.                 |
+| `QNAP_SHARE_PATH`           | `/share/{name}/`                                           | Absolute folder on QNAP where share is located at                             |
+| `SFTPGO_FOLDER_SYNC`        | `false`                                                    | Enable virtual folder sync upon successful login                              |
+| `SFTPGO_FOLDER_DESCRIPTION` | `QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway` | Use specific folder description in sftpgo during sync                         |
+| `SFTPGO_ACCOUNT_EXPIRATION` | `5m`                                                       | Set expiration time after of sftpgo user after successful login               |
+| `SFTPGO_AUTH_CACHE_TIME`    | by default same as `SFTPGO_ACCOUNT_EXPIRATION`             | Define time a login is cached by sftpgo. Default same as expiration. `0`=off. |                                                     
+| `SFTPGO_API_URL`            | `http://sftpgo:8080`                                       | API URL for sftpgo instance for virtual folder sync                           |
+| `SFTPGO_API_USER`           | `sa-qnap-authgw`                                           | sftpgo service account username; required for virtual folder sync             |
+| `SFTPGO_API_PASS`           | none                                                       | sftpgo service account password; required for virtual folder sync             |
+| `SFTPGO_CHECK_CERT`         | `true`                                                     | Verify sftpgo TLS cert; set to `false` to disable verification                |
+| `SFTPGO_HOMEDIR`            | `/var/tmp`                                                 | sftpgo requires this, empty folder is OK; `{user}` is replaced to username    |
+| `AUTHGW_TLS`                | `false`                                                    | Enable TLS and HTTPS \(not implemented yet\)                                  |
+| `LOG_LEVEL`                 | `info`                                                     | Log level \(allowed: trace\|debug\|info\|warn\|error\)                        |
 
 ## `compose.yml` example
 

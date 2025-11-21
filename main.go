@@ -193,7 +193,7 @@ func loadSettings() {
 	}
 
 	// --- SFTPGo API Configuration ---
-	SftpgoAPIURL = normalizeURL(getEnv("SFTPGO_API_URL", "http://host.docker.internal:8080"))
+	SftpgoAPIURL = normalizeURL(getEnv("SFTPGO_API_URL", "http://sftpgo:8080"))
 	SftpgoAPIUser = getEnv("SFTPGO_API_USER", "sa-qnap-authgw")
 	SftpgoAPIPass = getEnv("SFTPGO_API_PASS", "")
 

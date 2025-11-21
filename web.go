@@ -54,7 +54,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 			"user_agent": r.UserAgent(),
 			"path":       r.URL.Path,
 			"request_ip": ip,
-		}).Debug("incoming authentication request")
+		}).Debug("incoming request")
 
 		// Create a logger with request fields
 		logger := log.WithFields(log.Fields{
@@ -70,7 +70,7 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		log.WithFields(log.Fields{
 			"request_id": requestID,
 			"duration":   time.Since(start),
-		}).Debug("done handling authentication request")
+		}).Debug("done handling request")
 	})
 }
 
