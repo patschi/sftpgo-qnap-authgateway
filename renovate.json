@@ -6,22 +6,28 @@
   "reviewers": ["pkernstock"],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": ["security"]
+    "labels": ["security"],
+    "automerge": true
   },
   "packageRules": [
+    {
+      "matchFileNames": [".gitlab-ci.yml"],
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "enabled": true
+    },
     {
       "matchManagers": ["dockerfile", "docker-compose"],
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["patch"],
-      "automerge": true,
-      "automergeType": "branch"
+      "automerge": true
     },
     {
       "matchDatasources": ["docker"],
       "matchDepNames": ["gcr.io/distroless/static"],
       "matchFileNames": ["Dockerfile"],
       "automerge": true,
-      "automergeType": "branch",
       "enabled": true
     }
   ]
