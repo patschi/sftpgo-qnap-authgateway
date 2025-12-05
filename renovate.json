@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [ "config:best-practices" ],
+  "extends": [ "config:best-practices", "mergeConfidence:all-badges" ],
   "labels": ["renovate"],
   "assignees": ["pkernstock"],
   "reviewers": ["pkernstock"],
@@ -12,7 +12,7 @@
     {
       "matchManagers": ["dockerfile", "docker-compose"],
       "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["patch"],
       "automerge": true,
       "automergeType": "branch"
     },
