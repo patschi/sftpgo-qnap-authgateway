@@ -3,5 +3,26 @@
   "extends": [ "config:best-practices" ],
   "labels": ["renovate"],
   "assignees": ["pkernstock"],
-  "reviewers": ["pkernstock"]
+  "reviewers": ["pkernstock"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["gcr.io/distroless/static"],
+      "matchFileNames": ["Dockerfile"],
+      "automerge": true,
+      "automergeType": "branch",
+      "enabled": true
+    }
+  ]
 }
