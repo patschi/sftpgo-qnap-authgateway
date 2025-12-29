@@ -4,7 +4,7 @@ ARG APP_DIR
 ARG APP_BIN
 
 COPY /$APP_DIR/$APP_BIN /app
-COPY --from=ghcr.io/tarampampam/microcheck:1.0.1@sha256:e9b979feeddb23a6632cab9eb288e6f8cbaf9907ef060da071c7afd7cc85c5c5 /bin/httpscheck /bin/httpscheck
+COPY --from=ghcr.io/tarampampam/microcheck:1.3.0@sha256:79c187c05bfa67518078bf4db117771942fa8fe107dc79a905861c75ddf28dfa /bin/httpscheck /bin/httpscheck
 
 HEALTHCHECK --interval=60s --timeout=3s CMD ["/bin/httpscheck", "localhost:9999/healthz"]
 
