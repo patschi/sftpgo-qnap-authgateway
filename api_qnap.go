@@ -43,7 +43,7 @@ type qnapShareNode struct {
 
 var errAuthFailed = errors.New("authentication failed")
 
-// qnapLogin authenticates a user with a QNAP device and returns the session ID if login is successful or an error otherwise.
+// qnapLogin authenticates a user with a QNAP NAS and returns the session ID if login is successful.
 func qnapLogin(ctx context.Context, authLog *log.Entry, client *http.Client,
 	baseURL string, auth authRequest) (string, error) {
 	user := auth.Username
@@ -99,8 +99,8 @@ func qnapLogin(ctx context.Context, authLog *log.Entry, client *http.Client,
 
 	// Parse XML response
 	var xr qnapLoginResp
-	if jsonErr := xml.Unmarshal(bodyBytes, &xr); jsonErr != nil {
-		authLog.WithField("xml", reqBody).WithError(jsonErr).Warn("failed to parse xml login response")
+	if xmlErr := xml.Unmarshal(bodyBytes, &xr); xmlErr != nil {
+		authLog.WithField("xml", reqBody).WithError(xmlErr).Warn("failed to parse xml login response")
 		return "", errors.New("unable to parse login response")
 	}
 	authLog.WithField("response", fmt.Sprintf("%+v", xr)).Trace("parsed qnap api response struct")

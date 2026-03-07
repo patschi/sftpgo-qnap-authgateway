@@ -245,6 +245,7 @@ func loadSettings() {
 
 // setupLogger is initializing the logger and setting up the log level.
 func setupLogger() {
+	// TODO: Migrate to https://github.com/uber-go/zap
 	// Setup logging
 	log.SetOutput(os.Stdout)
 	log.SetReportCaller(true)

@@ -205,8 +205,8 @@ func sftpgoGetLoginToken(ctx context.Context, authLog *log.Entry, client *http.C
 	return data.AccessToken, resp.StatusCode, nil
 }
 
-// sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error if any.
-// This will invalidate the token, so it cannot longer be used.
+// sftpgoLogout logs out of sftpgo REST API. It returns the HTTP status code and error, if any.
+// This will invalidate the token, so it can no longer be used.
 func sftpgoLogout(ctx context.Context, authLog *log.Entry, client *http.Client, token string) (int, error) {
 	apiURL := fmt.Sprintf("%s/api/v2/logout", SftpgoAPIURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
@@ -232,7 +232,7 @@ func sftpgoLogout(ctx context.Context, authLog *log.Entry, client *http.Client, 
 	return resp.StatusCode, nil
 }
 
-// sftpgoCreateFolder creates a virtual folder in sftpgo REST API. It returns an error if any.
+// sftpgoCreateFolder creates a virtual folder in sftpgo REST API. It returns an error, if any.
 func sftpgoCreateFolder(ctx context.Context, authLog *log.Entry, client *http.Client,
 	token string, folder sftpgoBackendFolder) error {
 	payload, err := json.Marshal(folder)

@@ -4,6 +4,7 @@
   "labels": ["renovate"],
   "assignees": ["pkernstock"],
   "reviewers": ["pkernstock"],
+  "automergeType": "branch",
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["security"],
