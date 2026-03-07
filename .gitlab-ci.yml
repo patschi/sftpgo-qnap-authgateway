@@ -19,6 +19,7 @@ variables:
   CI_APPLICATION_REPOSITORY: "$CI_REGISTRY_IMAGE"
   CI_APPLICATION_TAG: "latest"
   GHCR_IMAGE: "ghcr.io/patschi/sftpgo-qnap-authgateway"
+  GITHUB_PROJECT_URL: "https://github.com/patschi/sftpgo-qnap-authgateway"
 
 secret_detection:
   stage: go-test
@@ -193,8 +194,8 @@ go_build:
       when: always
     - when: never
 
-# Build container
-build-docker:
+# Push container to GitLab Container Registry
+push-container-gitlab:
   stage: build-container
   image:
     name: martizih/kaniko:v1.26.6-debug@sha256:d2170bed1affc9d886853691c5ae7aa36163f2643de42693eb890bad8d1763ad
@@ -207,7 +208,7 @@ build-docker:
     - go_build
   before_script: []
   script:
-    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$(echo -n $CI_DEPENDENCY_PROXY_SERVER | awk -F[:] '{print $1}')\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"},\"ghcr.io\":{\"auth\":\"$(printf "%s:%s" "${GHCR_USER}" "${GHCR_TOKEN}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$(echo -n $CI_DEPENDENCY_PROXY_SERVER | awk -F[:] '{print $1}')\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
     - >
       /kaniko/executor
       --cache=true
@@ -229,7 +230,28 @@ build-docker:
       --context="$CI_PROJECT_DIR"
       --dockerfile="$CI_PROJECT_DIR/Dockerfile"
       --destination="$CI_REGISTRY_IMAGE:latest"
-      --destination="$GHCR_IMAGE:latest"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: always
+    - when: never
+
+# Copy container from GitLab to GitHub Container Registry, adding GitHub-specific label
+push-container-ghcr:
+  stage: build-container
+  image:
+    name: gcr.io/go-containerregistry/crane:debug
+    entrypoint: [""]
+  needs:
+    - push-container-gitlab
+  before_script: []
+  script:
+    - mkdir -p /root/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"ghcr.io\":{\"auth\":\"$(printf "%s:%s" "${GHCR_USER}" "${GHCR_TOKEN}" | base64 | tr -d '\n')\"}}}" > /root/.docker/config.json
+    - >
+      crane mutate
+      --label="org.opencontainers.image.source=$GITHUB_PROJECT_URL"
+      --tag="$GHCR_IMAGE:latest"
+      "$CI_REGISTRY_IMAGE:latest"
   rules:
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
       when: always
