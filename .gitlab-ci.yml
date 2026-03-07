@@ -13,11 +13,12 @@ variables:
   GO_BUILD_ARGS: ""
   GO_COVER_PACKAGES: ""
   GO_BUILD_NAME: "$CI_PROJECT_NAME"
-  SECRET_DETECTION_ENABLED: 'true'
-  GITLAB_ADVANCED_SAST_ENABLED: 'true'
+  SECRET_DETECTION_ENABLED: "true"
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
   SAST_EXCLUDED_PATHS: "**/.go"
   CI_APPLICATION_REPOSITORY: "$CI_REGISTRY_IMAGE"
-  CI_APPLICATION_TAG: 'latest'
+  CI_APPLICATION_TAG: "latest"
+  GHCR_IMAGE: "ghcr.io/patschi/sftpgo-qnap-authgateway"
 
 secret_detection:
   stage: go-test
@@ -206,7 +207,7 @@ build-docker:
     - go_build
   before_script: []
   script:
-    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$(echo -n $CI_DEPENDENCY_PROXY_SERVER | awk -F[:] '{print $1}')\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"},\"$(echo -n $CI_DEPENDENCY_PROXY_SERVER | awk -F[:] '{print $1}')\":{\"auth\":\"$(printf "%s:%s" ${CI_DEPENDENCY_PROXY_USER} "${CI_DEPENDENCY_PROXY_PASSWORD}" | base64 | tr -d '\n')\"},\"ghcr.io\":{\"auth\":\"$(printf "%s:%s" "${GHCR_USER}" "${GHCR_TOKEN}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
     - >
       /kaniko/executor
       --cache=true
@@ -222,11 +223,13 @@ build-docker:
       --annotation="org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
       --annotation="org.opencontainers.image.ref.name=$CI_COMMIT_REF_NAME"
       --annotation="org.opencontainers.image.description=$CI_PROJECT_DESCRIPTION"
+      --annotation="org.opencontainers.image.licenses=GPLv3"
       --build-arg="APP_DIR=$GO_BIN_DIR"
       --build-arg="APP_BIN=$GO_BUILD_NAME"
       --context="$CI_PROJECT_DIR"
       --dockerfile="$CI_PROJECT_DIR/Dockerfile"
       --destination="$CI_REGISTRY_IMAGE:latest"
+      --destination="$GHCR_IMAGE:latest"
   rules:
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
       when: always
