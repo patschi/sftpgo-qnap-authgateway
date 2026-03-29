@@ -238,7 +238,7 @@ push-container-gitlab:
 push-container-ghcr:
   stage: build-container
   image:
-    name: gcr.io/go-containerregistry/crane:debug
+    name: gcr.io/go-containerregistry/crane:debug@sha256:1d1b7b0a8a6114d9a569cb69c85252fe49331847857f831981465707662be5c2
     entrypoint: [""]
   needs:
     - push-container-gitlab
