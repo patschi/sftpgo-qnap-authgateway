@@ -38,7 +38,7 @@ stages:
 
 # Download dependencies
 go_mod_download:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: prepare
   script:
     - mkdir -p $GOPATH
@@ -83,7 +83,7 @@ go_lint:
 
 # Unit tests with coverage
 go_test:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: go-test
   needs:
     - job: go_mod_download
@@ -121,7 +121,7 @@ go_test:
 
 # Race condition tests
 go_test_race:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: go-test
   needs:
     - job: go_mod_download
@@ -137,7 +137,7 @@ go_test_race:
 
 # Check if go mod tidy produces any changes
 go_mod_tidy:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: go-test
   needs:
     - job: go_mod_download
@@ -156,7 +156,7 @@ go_mod_tidy:
 
 # Job to check for available updates for any direct module dependencies.
 go_mod_updates:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: go-test
   needs:
     - job: go_mod_download
@@ -179,7 +179,7 @@ go_mod_updates:
 
 # Build for current OS/arch
 go_build:
-  image: golang:1.26.1@sha256:595c7847cff97c9a9e76f015083c481d26078f961c9c8dca3923132f51fe12f1
+  image: golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
   stage: build-app
   script:
     - export CGO_ENABLED=0
