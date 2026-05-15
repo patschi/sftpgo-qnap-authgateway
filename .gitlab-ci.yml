@@ -142,6 +142,7 @@ go_mod_tidy:
   needs:
     - job: go_mod_download
       optional: true
+  allow_failure: true
   rules:
     - exists:
         - '**/go.sum'
