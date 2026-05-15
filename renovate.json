@@ -3,7 +3,6 @@
   "extends": [ "config:best-practices", "mergeConfidence:all-badges" ],
   "labels": ["renovate"],
   "assignees": ["pkernstock"],
-  "reviewers": ["pkernstock"],
   "automergeType": "branch",
   "vulnerabilityAlerts": {
     "enabled": true,
