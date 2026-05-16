@@ -48,13 +48,18 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Server", fmt.Sprintf("%s/%s", AppName, AppVersion))
 
-		logger.Debugw("incoming request",
-			"request_id", requestID,
-			"method", r.Method,
-			"user_agent", r.UserAgent(),
-			"path", r.URL.Path,
-			"request_ip", ip,
-		)
+		// Suppress noisy per-request logs for the health check endpoint
+		quiet := r.URL.Path == AuthHealthPath
+
+		if !quiet {
+			logger.Debugw("incoming request",
+				"request_id", requestID,
+				"method", r.Method,
+				"user_agent", r.UserAgent(),
+				"path", r.URL.Path,
+				"request_ip", ip,
+			)
+		}
 
 		// Create a logger with request fields
 		reqLogger := logger.With("request_id", requestID)
@@ -65,10 +70,12 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 
-		logger.Debugw("done handling request",
-			"request_id", requestID,
-			"duration", time.Since(start),
-		)
+		if !quiet {
+			logger.Debugw("done handling request",
+				"request_id", requestID,
+				"duration", time.Since(start),
+			)
+		}
 	})
 }
 
