@@ -62,6 +62,11 @@ const (
 	// QnapSharePrefix is the prefix that will be added for every share name
 	// This will be used as a human-readable identifier for the share in sftpgo
 	QnapSharePrefix = "QNAP_SHARE_"
+
+	// DefaultAccountExpiration is the default duration a sftpgo user account remains valid after login.
+	DefaultAccountExpiration = 5 * time.Minute
+	// DefaultAuthCacheTime is the default duration sftpgo caches a successful authentication for.
+	DefaultAuthCacheTime = 5 * time.Minute
 )
 
 var (
@@ -86,8 +91,10 @@ var (
 type Duration time.Duration
 
 // MarshalText implements encoding.TextMarshaler.
-func (d Duration) MarshalText() ([]byte, error) {
-	return []byte(time.Duration(d).String()), nil
+//
+//nolint:unparam // error return is part of the encoding.TextMarshaler interface contract
+func (d *Duration) MarshalText() ([]byte, error) {
+	return []byte(time.Duration(*d).String()), nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -101,8 +108,8 @@ func (d *Duration) UnmarshalText(b []byte) error {
 }
 
 // AsDuration returns the value as a standard time.Duration.
-func (d Duration) AsDuration() time.Duration {
-	return time.Duration(d)
+func (d *Duration) AsDuration() time.Duration {
+	return time.Duration(*d)
 }
 
 // -----------------------------
@@ -112,36 +119,36 @@ func (d Duration) AsDuration() time.Duration {
 // AuthGatewaySettings are settings for this auth gateway.
 type AuthGatewaySettings struct {
 	// LogLevel defines the log level to use (debug, info, warn, error, fatal)
-	LogLevel string `json:"log_level" env:"LOG_LEVEL"`
+	LogLevel string `env:"LOG_LEVEL" json:"log_level"`
 	// CertificateFile is the path to the certificate file
-	CertificateFile string `json:"certificate_file" env:"AUTHGW_CERTIFICATE_FILE"`
+	CertificateFile string `env:"AUTHGW_CERTIFICATE_FILE" json:"certificate_file"`
 	// KeyFile is the path to the key file
-	KeyFile string `json:"key_file" env:"AUTHGW_KEY_FILE"`
+	KeyFile string `env:"AUTHGW_KEY_FILE" json:"key_file"`
 }
 
 // QnapSettings are settings for QNAP.
 type QnapSettings struct {
 	// URL defines the full URL to use for QNAP API calls (example: https://10.0.0.100)
-	URL string `json:"url" env:"QNAP_URL" normalize:"url"`
+	URL string `env:"QNAP_URL" json:"url" normalize:"url"`
 	// CheckCert defines if the certificate of QNAP should be checked when accessing QNAP API
-	CheckCert bool `json:"check_cert" env:"QNAP_CHECK_CERT"`
+	CheckCert bool `env:"QNAP_CHECK_CERT" json:"check_cert"`
 	// SharePath defines a path for QNAP shares where the share is located (example: /share/{name}/ = /share/Public)
-	SharePath string `json:"share_path" env:"QNAP_SHARE_PATH" normalize:"url"`
+	SharePath string `env:"QNAP_SHARE_PATH" json:"share_path" normalize:"url"`
 	// PasswdFile is the path to the passwd file (usually within the container)
 	// This is hidden as it is used during development only.
-	PasswdFile string `json:"passwd_file" env:"QNAP_PASSWD_FILE"`
+	PasswdFile string `env:"QNAP_PASSWD_FILE" json:"passwd_file"`
 }
 
 // SftpgoAPISettings are settings on how to access sftpgo API.
 type SftpgoAPISettings struct {
 	// URL is the URL of the sftpgo API (only https://sftpgo.example.com; do NOT include the /api/ prefix)
-	URL string `json:"url" env:"SFTPGO_API_URL" normalize:"url"`
+	URL string `env:"SFTPGO_API_URL" json:"url" normalize:"url"`
 	// CheckCert defines if the certificate of sftpgo should be checked when accessing sftpgo REST API
-	CheckCert bool `json:"check_cert" env:"SFTPGO_API_CHECK_CERT"`
+	CheckCert bool `env:"SFTPGO_API_CHECK_CERT" json:"check_cert"`
 	// Username is the username to use for authentication with the sftpgo API
-	Username string `json:"user" env:"SFTPGO_API_USER"`
+	Username string `env:"SFTPGO_API_USER" json:"user"`
 	// Password is the password to use for authentication with the sftpgo API
-	Password string `json:"pass" env:"SFTPGO_API_PASS"`
+	Password string `env:"SFTPGO_API_PASS" json:"pass"`
 }
 
 // SftpgoSettings are settings for sftpgo.
@@ -149,17 +156,17 @@ type SftpgoSettings struct {
 	// API contains the settings for accessing the sftpgo API
 	API SftpgoAPISettings `json:"api"`
 	// HomeDir is the home directory for the sftpgo user (default: /var/tmp; "{username}" is replaced with the username)
-	HomeDir string `json:"home_dir" env:"SFTPGO_HOME_DIR"`
+	HomeDir string `env:"SFTPGO_HOME_DIR" json:"home_dir"`
 	// VirtualFolderSync is a flag to enable/disable virtual folder sync after successful
 	// authentication to QNAP NAS: When enabled, it will create, delete, or update virtual folders
 	// in sftpgo based on the shares accessible for a specific user during the time of login.
-	VirtualFolderSync bool `json:"virtual_folder_sync" env:"SFTPGO_FOLDER_SYNC"`
+	VirtualFolderSync bool `env:"SFTPGO_FOLDER_SYNC" json:"virtual_folder_sync"`
 	// ManagedFolderDesc is the description text that will be added to every share description
-	ManagedFolderDesc string `json:"managed_folder_desc" env:"SFTPGO_FOLDER_DESCRIPTION"`
+	ManagedFolderDesc string `env:"SFTPGO_FOLDER_DESCRIPTION" json:"managed_folder_desc"`
 	// AccountExpiration is the duration for which the user account will be valid after successful login
-	AccountExpiration Duration `json:"account_expiration" env:"SFTPGO_ACCOUNT_EXPIRATION"`
+	AccountExpiration Duration `env:"SFTPGO_ACCOUNT_EXPIRATION" json:"account_expiration"`
 	// AuthCacheTime is the duration for how long sftpgo should cache the successful login
-	AuthCacheTime Duration `json:"auth_cache_time" env:"SFTPGO_AUTH_CACHE_TIME"`
+	AuthCacheTime Duration `env:"SFTPGO_AUTH_CACHE_TIME" json:"auth_cache_time"`
 }
 
 // Settings is the root configuration struct.
@@ -174,9 +181,13 @@ type Settings struct {
 
 // config is the global configuration with embedded default values.
 // Environment variables listed in `env` struct tags override these defaults.
+//
+//nolint:gosec // G101: file paths and usernames below are defaults, not hardcoded credentials.
 var config = Settings{
 	AuthGateway: AuthGatewaySettings{
-		LogLevel: "info",
+		LogLevel:        "info",
+		CertificateFile: "",
+		KeyFile:         "",
 	},
 	Qnap: QnapSettings{
 		URL:        "https://host.docker.internal",
@@ -189,12 +200,13 @@ var config = Settings{
 			URL:       "http://sftpgo:8080",
 			CheckCert: true,
 			Username:  "sa-qnap-authgw",
+			Password:  "",
 		},
 		HomeDir:           "/var/tmp",
 		VirtualFolderSync: false,
 		ManagedFolderDesc: "QNAP Share: {name} / Managed by sftpgo-qnap-auth-gateway",
-		AccountExpiration: Duration(5 * time.Minute),
-		AuthCacheTime:     Duration(5 * time.Minute),
+		AccountExpiration: Duration(DefaultAccountExpiration),
+		AuthCacheTime:     Duration(DefaultAuthCacheTime),
 	},
 }
 
@@ -395,18 +407,22 @@ func setupLogger() {
 	}
 
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "time",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		CallerKey:      "caller",
-		FunctionKey:    zapcore.OmitKey,
-		MessageKey:     "msg",
-		StacktraceKey:  "stacktrace",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    encodeLevel,
-		EncodeTime:     zapcore.TimeEncoderOfLayout("2006-01-02T15:04:05.000"),
-		EncodeDuration: zapcore.StringDurationEncoder,
-		EncodeCaller:   encodeCaller,
+		TimeKey:             "time",
+		LevelKey:            "level",
+		NameKey:             "logger",
+		CallerKey:           "caller",
+		FunctionKey:         zapcore.OmitKey,
+		MessageKey:          "msg",
+		StacktraceKey:       "stacktrace",
+		SkipLineEnding:      false,
+		LineEnding:          zapcore.DefaultLineEnding,
+		EncodeLevel:         encodeLevel,
+		EncodeTime:          zapcore.TimeEncoderOfLayout("2006-01-02T15:04:05.000"),
+		EncodeDuration:      zapcore.StringDurationEncoder,
+		EncodeCaller:        encodeCaller,
+		EncodeName:          nil,
+		NewReflectedEncoder: nil,
+		ConsoleSeparator:    "",
 	}
 
 	levelEnabler := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
@@ -444,7 +460,7 @@ func setupLogger() {
 // String fields tagged with normalize:"url" have trailing slashes and surrounding whitespace trimmed.
 func loadEnvInto(s any) error {
 	rv := reflect.ValueOf(s)
-	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+	if rv.Kind() != reflect.Pointer || rv.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("loadEnvInto: expected pointer to struct, got %T", s)
 	}
 	return populateFromEnv(rv.Elem())
@@ -454,55 +470,66 @@ func loadEnvInto(s any) error {
 func populateFromEnv(rv reflect.Value) error {
 	rt := rv.Type()
 	for i := range rt.NumField() {
-		field := rt.Field(i)
-		fv := rv.Field(i)
-		envKey := field.Tag.Get("env")
-
-		// Fields without an env tag are either nested config groups (recurse) or ignored.
-		if envKey == "" {
-			if fv.Kind() == reflect.Struct {
-				if err := populateFromEnv(fv); err != nil {
-					return err
-				}
-			}
-			continue
+		if err := populateStructField(rt.Field(i), rv.Field(i)); err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		rawVal, ok := os.LookupEnv(envKey)
-		if !ok {
-			continue // env var not set; keep default
+// populateStructField applies environment variable overrides to a single struct field,
+// recursing into nested structs that have no env tag of their own.
+func populateStructField(field reflect.StructField, fv reflect.Value) error {
+	envKey := field.Tag.Get("env")
+
+	// Fields without an env tag are either nested config groups (recurse) or ignored.
+	if envKey == "" {
+		if fv.Kind() == reflect.Struct {
+			return populateFromEnv(fv)
 		}
-		rawVal = strings.TrimSpace(rawVal)
+		return nil
+	}
 
-		// Prefer TextUnmarshaler if implemented (e.g., Duration, time.Time).
-		// Checked before the Kind switch so struct types implementing
-		// TextUnmarshaler are unmarshaled instead of recursed into.
-		if fv.CanAddr() {
-			if u, ok := fv.Addr().Interface().(encoding.TextUnmarshaler); ok {
-				if err := u.UnmarshalText([]byte(rawVal)); err != nil {
-					return fmt.Errorf("env %s: %w", envKey, err)
-				}
-				continue
+	rawVal, present := os.LookupEnv(envKey)
+	if !present {
+		return nil // env var not set; keep default
+	}
+	rawVal = strings.TrimSpace(rawVal)
+
+	// Prefer TextUnmarshaler if implemented (e.g., Duration, time.Time).
+	// Checked before the Kind switch so struct types implementing
+	// TextUnmarshaler are unmarshaled instead of recursed into.
+	if fv.CanAddr() {
+		if unmarshaler, isUnmarshaler := fv.Addr().Interface().(encoding.TextUnmarshaler); isUnmarshaler {
+			if err := unmarshaler.UnmarshalText([]byte(rawVal)); err != nil {
+				return fmt.Errorf("env %s: %w", envKey, err)
 			}
+			return nil
 		}
+	}
 
-		switch fv.Kind() {
-		case reflect.String:
-			if field.Tag.Get("normalize") == "url" {
-				rawVal = normalizeURL(rawVal)
-			}
-			fv.SetString(rawVal)
+	return setScalarField(field, fv, envKey, rawVal)
+}
 
-		case reflect.Bool:
-			b, err := strconv.ParseBool(rawVal)
-			if err != nil {
-				return fmt.Errorf("env %s: invalid boolean value %q: %w", envKey, rawVal, err)
-			}
-			fv.SetBool(b)
-
-		default:
-			return fmt.Errorf("env %s: unsupported field type %s", envKey, fv.Type())
+// setScalarField writes a string-encoded env value into a primitive scalar field.
+// Supported kinds: string (with optional url normalization) and bool.
+func setScalarField(field reflect.StructField, fv reflect.Value, envKey, rawVal string) error {
+	switch fv.Kind() { //nolint:exhaustive // only string and bool are supported scalars; other kinds fall through to the default error
+	case reflect.String:
+		if field.Tag.Get("normalize") == "url" {
+			rawVal = normalizeURL(rawVal)
 		}
+		fv.SetString(rawVal)
+
+	case reflect.Bool:
+		b, err := strconv.ParseBool(rawVal)
+		if err != nil {
+			return fmt.Errorf("env %s: invalid boolean value %q: %w", envKey, rawVal, err)
+		}
+		fv.SetBool(b)
+
+	default:
+		return fmt.Errorf("env %s: unsupported field type %s", envKey, fv.Type())
 	}
 	return nil
 }

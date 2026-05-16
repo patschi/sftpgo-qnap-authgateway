@@ -120,7 +120,8 @@ func qnapLogin(ctx context.Context, authLog *zap.SugaredLogger, client *http.Cli
 // qnapLogout logs out a user from a QNAP NAS via the authLogout API endpoint.
 // It takes a context and HTTP client as parameters.
 // Returns an error in case of failure.
-func qnapLogout(ctx context.Context, authLog *zap.SugaredLogger, client *http.Client, baseURL string, sid string) error {
+func qnapLogout(ctx context.Context, authLog *zap.SugaredLogger, client *http.Client,
+	baseURL string, sid string) error {
 	authLog.Logw(TraceLevel, "destroying session on qnap api", "sid", sid)
 
 	logoutURL := fmt.Sprintf("%s/cgi-bin/authLogout.cgi", baseURL)

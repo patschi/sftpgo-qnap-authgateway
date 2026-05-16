@@ -410,7 +410,8 @@ func filterInvalidFolders(virtualFolders *[]sftpgoVirtualFolder, failedFolders [
 
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.
 // It returns a map of permissions and a slice of virtual folders.
-func buildVirtualFolders(authLog *zap.SugaredLogger, shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
+func buildVirtualFolders(authLog *zap.SugaredLogger,
+	shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
 	// Build virtual folders
 	folders := make([]sftpgoBackendFolder, 0, len(shares))
 	virtualFolders := make([]sftpgoVirtualFolder, 0, len(shares))
