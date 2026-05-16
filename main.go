@@ -36,7 +36,7 @@ const (
 	// AppName is the name of the application
 	AppName = "SftpgoQnapAuthGateway"
 	// AppVersion is the current version of the application
-	AppVersion = "0.1.0"
+	AppVersion = "0.2.0"
 
 	// AuthGwAddr defines to which address it's binding it on
 	AuthGwAddr = "0.0.0.0"
