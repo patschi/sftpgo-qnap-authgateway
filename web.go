@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 // -----------------------------
@@ -48,29 +48,27 @@ func HTTPServerMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Server", fmt.Sprintf("%s/%s", AppName, AppVersion))
 
-		log.WithFields(log.Fields{
-			"request_id": requestID,
-			"method":     r.Method,
-			"user_agent": r.UserAgent(),
-			"path":       r.URL.Path,
-			"request_ip": ip,
-		}).Debug("incoming request")
+		logger.Debugw("incoming request",
+			"request_id", requestID,
+			"method", r.Method,
+			"user_agent", r.UserAgent(),
+			"path", r.URL.Path,
+			"request_ip", ip,
+		)
 
 		// Create a logger with request fields
-		logger := log.WithFields(log.Fields{
-			"request_id": requestID,
-		})
+		reqLogger := logger.With("request_id", requestID)
 
 		// Add the logger to the request context
-		ctx := context.WithValue(r.Context(), loggerContextKey, logger)
+		ctx := context.WithValue(r.Context(), loggerContextKey, reqLogger)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 
-		log.WithFields(log.Fields{
-			"request_id": requestID,
-			"duration":   time.Since(start),
-		}).Debug("done handling request")
+		logger.Debugw("done handling request",
+			"request_id", requestID,
+			"duration", time.Since(start),
+		)
 	})
 }
 
@@ -116,10 +114,10 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// a few sanity checks
 	// only allow POST
 	if r.Method != http.MethodPost {
-		authLog.WithFields(log.Fields{
-			"path":   r.URL.Path,
-			"method": r.Method,
-		}).Warn("invalid method accessed")
+		authLog.Warnw("invalid method accessed",
+			"path", r.URL.Path,
+			"method", r.Method,
+		)
 		http.Error(w, "method not implemented", http.StatusMethodNotAllowed)
 		return
 	}
@@ -134,26 +132,26 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 		var mbe *http.MaxBytesError
 		if errors.As(err, &mbe) {
 			// Body exceeded MaxBodyBytes
-			authLog.WithError(err).Warn("request body too large")
+			authLog.Warnw("request body too large", "error", err)
 			writeDeny(w, http.StatusRequestEntityTooLarge, "body_too_large",
 				fmt.Sprintf("request body too large (limit %d bytes)", MaxBodyBytes))
 			return
 		}
 
-		// otherwise it's a malformed JSON body'
-		authLog.WithError(err).Warn("malformed JSON body")
+		// otherwise it's a malformed JSON body
+		authLog.Warnw("malformed JSON body", "error", err)
 		writeDeny(w, http.StatusBadRequest, "invalid_json", "malformed JSON body")
 		return
 	}
 
 	// check for supported authentication methods
 	if req.PublicKey != "" || req.KeyboardInteractive != "" || req.TLSCert != "" {
-		authLog.WithFields(log.Fields{
-			"password":             len(req.Password.String()),
-			"public_key":           req.PublicKey,
-			"keyboard_interactive": req.KeyboardInteractive,
-			"tls_cert":             req.TLSCert,
-		}).Warn("unsupported authentication method")
+		authLog.Warnw("unsupported authentication method",
+			"password", len(req.Password.String()),
+			"public_key", req.PublicKey,
+			"keyboard_interactive", req.KeyboardInteractive,
+			"tls_cert", req.TLSCert,
+		)
 		writeDeny(w, http.StatusBadRequest, "unsupported_method", "unsupported authentication method")
 		return
 	}
@@ -166,24 +164,24 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// add username to all logs
-	authLog = authLog.WithField("user", req.Username)
+	authLog = authLog.With("user", req.Username)
 
-	authLog.WithFields(log.Fields{
-		"protocol": req.Protocol,
-		"ip":       req.IP,
-	}).Info("auth request received")
+	authLog.Infow("auth request received",
+		"protocol", req.Protocol,
+		"ip", req.IP,
+	)
 
 	// Process authentication request
 	resp, err := performAuthentication(authLog, r, w, req)
 	if err != nil {
-		authLog.WithError(err).Error("failed to process authentication request")
+		authLog.Errorw("failed to process authentication request", "error", err)
 		return
 	}
 
 	// Encode response as JSON and return to the client
 	data, err := json.Marshal(resp)
 	if err != nil {
-		authLog.WithError(err).Error("failed to encode success response")
+		authLog.Errorw("failed to encode success response", "error", err)
 		writeDeny(w, http.StatusInternalServerError, "json_encode_failed",
 			"failed to encode success response")
 		return
@@ -192,11 +190,11 @@ func webAuthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, respErr := w.Write(data); respErr != nil {
-		authLog.WithError(respErr).Error("failed to write response")
+		authLog.Errorw("failed to write response", "error", respErr)
 	}
 
 	authLog.Info("reported authentication success to sftpgo")
-	authLog.WithField("response", string(data)).Trace("debug authentication json response")
+	authLog.Logw(TraceLevel, "debug authentication json response", "response", string(data))
 }
 
 // webHealthHandler is the health check endpoint. For example, used by docker health checks.
@@ -207,10 +205,10 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 	// a few sanity checks
 	// only allow GET or HEAD
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		authLog.WithFields(log.Fields{
-			"path":   r.URL.Path,
-			"method": r.Method,
-		}).Warn("invalid method accessed")
+		authLog.Warnw("invalid method accessed",
+			"path", r.URL.Path,
+			"method", r.Method,
+		)
 		http.Error(w, "method not implemented", http.StatusMethodNotAllowed)
 		return
 	}
@@ -218,16 +216,7 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 	data := []byte("")
 	// Only build response body for GET requests
 	if r.Method == http.MethodGet {
-		// Default value for uptime is 0
-		var uptime int64
-
-		// Get application start time
-		appStartTimeParsed, parseErr := time.Parse(time.RFC3339Nano, AppStartTime)
-		if parseErr != nil {
-			authLog.WithError(parseErr).Error("failed to parse app start time")
-		} else {
-			uptime = int64(time.Since(appStartTimeParsed).Seconds())
-		}
+		uptime := int64(time.Since(AppStartTime).Seconds())
 
 		// Build response success in JSON format
 		status := map[string]interface{}{
@@ -239,7 +228,7 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 		var err error
 		data, err = json.Marshal(status)
 		if err != nil {
-			authLog.WithError(err).Error("failed to encode health response")
+			authLog.Errorw("failed to encode health response", "error", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -249,10 +238,10 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	if _, respErr := w.Write(data); respErr != nil {
-		authLog.WithError(respErr).Error("failed to write response")
+		authLog.Errorw("failed to write response", "error", respErr)
 	}
 
-	log.WithField("response", string(data)).Trace("debug health check response")
+	logger.Logw(TraceLevel, "debug health check response", "response", string(data))
 }
 
 // performAuthentication performs the authentication workflow.
@@ -265,12 +254,12 @@ func webHealthHandler(w http.ResponseWriter, r *http.Request) {
 // - fetch shares from QNAP API
 // - build virtual folders and permissions
 // - sync folders to sftpgo
-func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseWriter,
+func performAuthentication(authLog *zap.SugaredLogger, r *http.Request, w http.ResponseWriter,
 	req authRequest) (sftpgoResponse, error) {
 	// Create a per-request cookie jar and client (no shared cookies)
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		authLog.WithError(err).Error("failed to create cookie jar")
+		authLog.Errorw("failed to create cookie jar", "error", err)
 		writeDeny(w, http.StatusInternalServerError, "internal_error",
 			"failed to initialize authentication")
 		return sftpgoResponse{}, err
@@ -282,7 +271,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 		Timeout: HTTPTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: !QnapCheckCert,
+				InsecureSkipVerify: !config.Qnap.CheckCert,
 				MinVersion:         tls.VersionTLS12,
 			},
 		},
@@ -294,7 +283,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 
 	// qnapLogin uses ctx to abort the request if timeout
 	authLog.Debug("initiating qnap login")
-	sid, err := qnapLogin(ctx, authLog, client, QnapURL, req)
+	sid, err := qnapLogin(ctx, authLog, client, config.Qnap.URL, req)
 	req.Password.Wipe() // Wipe password from memory
 
 	if err != nil {
@@ -306,27 +295,27 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 			return sftpgoResponse{}, err
 		}
 		// other errors (timeout, network) -> ERROR
-		authLog.WithError(err).Errorf("qnap login error")
+		authLog.Errorw("qnap login error", "error", err)
 		writeDeny(w, http.StatusInternalServerError, "qnap_error", "qnap authentication error")
 		return sftpgoResponse{}, err
 	}
 	authLog.Info("qnap login workflow reported success")
 
 	// Fetch shares
-	shares, err := qnapGetShares(ctx, authLog, client, QnapURL, sid)
+	shares, err := qnapGetShares(ctx, authLog, client, config.Qnap.URL, sid)
 	if err != nil {
-		authLog.WithError(err).Errorf("failed to fetch shares for user")
+		authLog.Errorw("failed to fetch shares for user", "error", err)
 		writeDeny(w, http.StatusInternalServerError, "share_fetch_failed", "failed to query shares")
 		return sftpgoResponse{}, err
 	}
 
 	// Shares received. Proceeding.
-	authLog.WithField("count", len(shares)).Info("accessible shares retrieved")
+	authLog.Infow("accessible shares retrieved", "count", len(shares))
 
 	// Logout user from QNAP
 	authLog.Debug("logging user out of qnap api...")
-	if qlErr := qnapLogout(ctx, authLog, client, QnapURL, sid); qlErr != nil {
-		authLog.WithError(qlErr).Errorf("failed to logout of qnap. proceeding...")
+	if qlErr := qnapLogout(ctx, authLog, client, config.Qnap.URL, sid); qlErr != nil {
+		authLog.Errorw("failed to logout of qnap. proceeding...", "error", qlErr)
 	}
 
 	// Build virtual folders and permissions
@@ -335,7 +324,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	// Initiate sftpgo virtual folder sync
 	failedFolders, err := sftpgoSyncFolders(authLog, folders)
 	if err != nil {
-		authLog.WithError(err).Error("failed to sync folders, denying login")
+		authLog.Errorw("failed to sync folders, denying login", "error", err)
 		writeDeny(w, http.StatusInternalServerError, "sync_folders_failed",
 			"failed to sync folders")
 		return sftpgoResponse{}, err
@@ -344,17 +333,17 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 
 	// Calculate user expiry in 5 minutes from now (in unix timestamp milliseconds)
 	// Just to ensure no login will be valid for more than 5 minutes and needs to be renewed via this service
-	userExpiry := time.Now().Add(SftpgoAccountExpirationDuration).UnixMilli()
+	userExpiry := time.Now().Add(config.Sftpgo.AccountExpiration.AsDuration()).UnixMilli()
 
 	// Get home directory
-	homeDir := strings.ReplaceAll(SftpgoHomeDir, "{user}", req.Username)
+	homeDir := strings.ReplaceAll(config.Sftpgo.HomeDir, "{user}", req.Username)
 
 	// Build permissions map
 	perms := getPermissionMap(authLog, virtualFolders)
 
 	// Build filters map
 	filters := sftpgoUserFilters{
-		ExternalAuthCacheTime: int(SftpgoAuthCacheTimeDuration.Seconds()),
+		ExternalAuthCacheTime: int(config.Sftpgo.AuthCacheTime.AsDuration().Seconds()),
 	}
 
 	// Build response success
@@ -372,7 +361,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 	// Set UID/GID if possible
 	userInfo, passwdErr := getPasswdFileUser(req.Username)
 	if passwdErr == nil {
-		authLog.WithField("uid", userInfo.UID).WithField("gid", userInfo.GID).Debug("setting UID/GID for user")
+		authLog.Debugw("setting UID/GID for user", "uid", userInfo.UID, "gid", userInfo.GID)
 		resp.UID = userInfo.UID
 		resp.GID = userInfo.GID
 	}
@@ -381,7 +370,7 @@ func performAuthentication(authLog *log.Entry, r *http.Request, w http.ResponseW
 }
 
 // getPermissionMap builds the permissions map for sftpgo based on the virtual folders.
-func getPermissionMap(authLog *log.Entry, virtualFolders []sftpgoVirtualFolder) map[string][]string {
+func getPermissionMap(authLog *zap.SugaredLogger, virtualFolders []sftpgoVirtualFolder) map[string][]string {
 	// Allocate permissions map +1 for the root folder
 	perms := make(map[string][]string, len(virtualFolders)+1)
 
@@ -393,7 +382,7 @@ func getPermissionMap(authLog *log.Entry, virtualFolders []sftpgoVirtualFolder) 
 		perms[virtualFolders[i].VirtualPath] = virtualFolders[i].Permission
 	}
 
-	authLog.WithField("permissions", perms).Trace("permissions map")
+	authLog.Logw(TraceLevel, "permissions map", "permissions", perms)
 	return perms
 }
 
@@ -421,7 +410,7 @@ func filterInvalidFolders(virtualFolders *[]sftpgoVirtualFolder, failedFolders [
 
 // buildVirtualFolders builds the virtual folders and permissions for the given QNAP shares.
 // It returns a map of permissions and a slice of virtual folders.
-func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
+func buildVirtualFolders(authLog *zap.SugaredLogger, shares []qnapShareNode) ([]sftpgoBackendFolder, []sftpgoVirtualFolder) {
 	// Build virtual folders
 	folders := make([]sftpgoBackendFolder, 0, len(shares))
 	virtualFolders := make([]sftpgoVirtualFolder, 0, len(shares))
@@ -430,22 +419,22 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 	for _, s := range shares {
 		// Skip any shares that are not iconCls=folder
 		if s.IconCls != "folder" {
-			authLog.WithFields(log.Fields{
-				"name": s.ID,
-				"text": s.Text,
-				"icon": s.IconCls,
-			}).Debug("skipped share as it is not iconCls=folder")
+			authLog.Debugw("skipped share as it is not iconCls=folder",
+				"name", s.ID,
+				"text", s.Text,
+				"icon", s.IconCls,
+			)
 			continue
 		}
 
 		// skip any shares that the user does not have either
 		// read or write access to
 		if s.Cls != "r" && s.Cls != "w" {
-			authLog.WithFields(log.Fields{
-				"name": s.ID,
-				"text": s.Text,
-				"cls":  s.Cls,
-			}).Debug("skipped share with non-r/w modes")
+			authLog.Debugw("skipped share with non-r/w modes",
+				"name", s.ID,
+				"text", s.Text,
+				"cls", s.Cls,
+			)
 			continue
 		}
 
@@ -454,7 +443,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 		name := s.Text
 		if name == "" {
 			name = strings.Trim(s.ID, "/")
-			authLog.WithField("name", name).Warn("empty share name, using ID instead")
+			authLog.Warnw("empty share name, using ID instead", "name", name)
 		}
 		name = QnapSharePrefix + strings.TrimSpace(name)
 		name = strings.ReplaceAll(name, "/", "_")
@@ -463,7 +452,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 		// Build paths for virtual folder and QNAP
 		sftpgoPath := strings.TrimSpace(s.ID)
 
-		qnapPath := strings.TrimSpace(QnapSharePath)
+		qnapPath := strings.TrimSpace(config.Qnap.SharePath)
 		qnapPath = strings.ReplaceAll(qnapPath, "{name}", s.ID)
 		qnapPath = strings.ReplaceAll(qnapPath, "//", "/")
 
@@ -477,7 +466,7 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 		}
 
 		// Parse description
-		folderDesc := strings.ReplaceAll(SftpgoManagedFolderDesc, "{name}", s.Text)
+		folderDesc := strings.ReplaceAll(config.Sftpgo.ManagedFolderDesc, "{name}", s.Text)
 
 		// adding sftpgo folder
 		folder := sftpgoBackendFolder{
@@ -499,15 +488,15 @@ func buildVirtualFolders(authLog *log.Entry, shares []qnapShareNode) ([]sftpgoBa
 		virtualFolders = append(virtualFolders, virtualFolder)
 
 		// log
-		authLog.WithFields(log.Fields{
-			"name":        name,
-			"sftpgo_path": sftpgoPath,
-			"qnap_path":   qnapPath,
-			"perms":       vfPerms,
-		}).Debug("added qnap share to array")
+		authLog.Debugw("added qnap share to array",
+			"name", name,
+			"sftpgo_path", sftpgoPath,
+			"qnap_path", qnapPath,
+			"perms", vfPerms,
+		)
 	}
 
-	authLog.WithField("folders", folders).Trace("all folders")
+	authLog.Logw(TraceLevel, "all folders", "folders", folders)
 	return folders, virtualFolders
 }
 
@@ -522,7 +511,7 @@ func closeIOBody(body *io.ReadCloser) {
 	}
 	readErr := (*body).Close()
 	if readErr != nil {
-		log.WithError(readErr).Error("failed to close response body")
+		logger.Errorw("failed to close response body", "error", readErr)
 	}
 }
 
@@ -555,12 +544,12 @@ func writeDeny(w http.ResponseWriter, httpCode int, errCode string, message stri
 }
 
 // LoggerFromContext is a function to get logger from other context
-func LoggerFromContext(ctx context.Context) *log.Entry {
-	if logger, ok := ctx.Value(loggerContextKey).(*log.Entry); ok {
-		return logger
+func LoggerFromContext(ctx context.Context) *zap.SugaredLogger {
+	if reqLogger, ok := ctx.Value(loggerContextKey).(*zap.SugaredLogger); ok {
+		return reqLogger
 	}
 	// Return default logger if none in context
-	return log.NewEntry(log.StandardLogger())
+	return logger
 }
 
 // shortRequestID generates a random hexadecimal string of length n or a fallback time-based string on failure.
@@ -620,7 +609,7 @@ func (w *SecureBytes) WriteBase64To(dst io.Writer) error {
 // Wipe zeroes the memory in place and releases the slice.
 func (w *SecureBytes) Wipe() {
 	if w == nil {
-		log.Warn("Wipe called on nil SecureBytes")
+		logger.Warn("Wipe called on nil SecureBytes")
 		return
 	}
 	for i := range *w {
@@ -640,7 +629,7 @@ func (w *SecureBytes) String() string {
 // Helper function variant: call as WipeBuffer(&buf).
 func WipeBuffer(buf *bytes.Buffer) {
 	if buf == nil {
-		log.Warn("WipeBuffer called on nil buffer")
+		logger.Warn("WipeBuffer called on nil buffer")
 		return
 	}
 	b := buf.Bytes()

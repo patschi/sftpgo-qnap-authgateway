@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Example of QNAP passwd file:
@@ -24,7 +22,7 @@ type passwdUser struct {
 
 // checkPasswdFileExistence checks if the passwd file has been mounted within the container at /nas_passwd
 func checkPasswdFileExistence() bool {
-	if _, err := os.Stat(QnapPasswdFile); os.IsNotExist(err) {
+	if _, err := os.Stat(config.Qnap.PasswdFile); os.IsNotExist(err) {
 		return false
 	}
 	return true
@@ -32,11 +30,11 @@ func checkPasswdFileExistence() bool {
 
 // getPasswdFileAllUsers parses the passwd file and returns all users found
 func getPasswdFileAllUsers() ([]passwdUser, error) {
-	log.Debug("parsing qnap passwd file")
+	logger.Debug("parsing qnap passwd file")
 
-	data, err := os.ReadFile(QnapPasswdFile)
+	data, err := os.ReadFile(config.Qnap.PasswdFile)
 	if err != nil {
-		log.WithError(err).Error("failed to read qnap passwd file: line")
+		logger.Errorw("failed to read qnap passwd file", "error", err)
 		return []passwdUser{}, err
 	}
 
@@ -47,43 +45,43 @@ func getPasswdFileAllUsers() ([]passwdUser, error) {
 			continue
 		}
 		line = strings.TrimSuffix(line, "\r")
-		// log.WithField("line", line).Trace("parsed qnap passwd file line")
+		// logger.Logw(TraceLevel, "parsed qnap passwd file line", "line", line)
 		line := strings.Split(line, ":")
 
 		// Parse current line
 		username := line[0]
 		homeDir := line[5]
 
-		uid, uidInt := strconv.Atoi(line[2])
-		if uidInt != nil {
-			log.WithError(uidInt).Error("failed to parse qnap passwd: uid invalid, skipping")
+		uid, uidErr := strconv.Atoi(line[2])
+		if uidErr != nil {
+			logger.Errorw("failed to parse qnap passwd: uid invalid, skipping", "error", uidErr)
 			continue
 		}
 		if uid < 0 || uid > math.MaxInt32 {
-			log.Error("failed to parse qnap passwd: uid out of int32 range, skipping")
+			logger.Error("failed to parse qnap passwd: uid out of int32 range, skipping")
 			continue
 		}
 
-		gid, gidInt := strconv.Atoi(line[3])
-		if gidInt != nil {
-			log.WithError(gidInt).Error("failed to parse qnap passwd: gid invalid, skipping")
+		gid, gidErr := strconv.Atoi(line[3])
+		if gidErr != nil {
+			logger.Errorw("failed to parse qnap passwd: gid invalid, skipping", "error", gidErr)
 			continue
 		}
 		if gid < 0 || gid > math.MaxInt32 {
-			log.Error("failed to parse qnap passwd: gid out of int32 range, skipping")
+			logger.Error("failed to parse qnap passwd: gid out of int32 range, skipping")
 			continue
 		}
 
-		log.WithFields(log.Fields{
-			"username": username,
-			"uid":      uid,
-			"gid":      gid,
-			"homeDir":  homeDir,
-		}).Trace("parsed qnap passwd file line")
+		logger.Logw(TraceLevel, "parsed qnap passwd file line",
+			"username", username,
+			"uid", uid,
+			"gid", gid,
+			"homeDir", homeDir,
+		)
 
 		// check if all fields are present
 		if username == "" || homeDir == "" {
-			log.Error("failed to parse qnap passwd file: line invalid, skipping")
+			logger.Error("failed to parse qnap passwd file: line invalid, skipping")
 			continue
 		}
 
@@ -96,9 +94,7 @@ func getPasswdFileAllUsers() ([]passwdUser, error) {
 		})
 	}
 
-	log.WithFields(log.Fields{
-		"users": len(users),
-	}).Trace("parsed qnap passwd file")
+	logger.Logw(TraceLevel, "parsed qnap passwd file", "users", len(users))
 
 	return users, nil
 }
@@ -107,14 +103,14 @@ func getPasswdFileAllUsers() ([]passwdUser, error) {
 func getPasswdFileUser(username string) (passwdUser, error) {
 	users, err := getPasswdFileAllUsers()
 	if err != nil {
-		log.WithError(err).Error("failed to get user data from passwd file")
+		logger.Errorw("failed to get user data from passwd file", "error", err)
 		return passwdUser{}, err
 	}
 
 	// Find the user in the passwd file
 	for _, user := range users {
 		if user.Username == username {
-			log.WithField("username", username).Trace("found user in passwd file")
+			logger.Logw(TraceLevel, "found user in passwd file", "username", username)
 			return user, nil
 		}
 	}
